@@ -197,6 +197,16 @@ function IconChart({ size = 20 }: { size?: number }) {
   );
 }
 
+function IconKanban({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <rect x="2" y="3" width="4.5" height="14" rx="1.2" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="7.75" y="3" width="4.5" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="13.5" y="3" width="4.5" height="11.5" rx="1.2" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function IconLogs({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
@@ -1750,10 +1760,22 @@ function EmptyState({ message }: { message: string }) {
 
 // ─── Developer Profile Page (Screen 1) ────────────────────────────────────────
 
-const devNavItems = [
-  { icon: IconDashboard, label: "Dashboard", id: "dashboard" },
+// One shared item list for both the Developer Profile and Sprint Dashboard
+// sidebars, so a student sees the same nav regardless of which of those two
+// top-level pages they're currently on. Every destination appears exactly
+// once — Bids/Messages/Settings used to be duplicated across two separate
+// lists (devNavItems/sprintNavItems), and crossing between the two pages
+// required the bottom page switcher. "sprintoverview"/"sprint" jump to the
+// Sprint Dashboard page; everything else stays on (or returns to) Developer
+// Profile. See the onNav wiring at each sidebar's call site for the mapping.
+const studentNavItems = [
+  { icon: IconDashboard, label: "Developer Profile", id: "profile" },
 
   { icon: IconMarket, label: "Marketplace", id: "marketplace" },
+
+  { icon: IconChart, label: "Sprint Overview", id: "sprintoverview" },
+
+  { icon: IconKanban, label: "Sprint Board", id: "sprint" },
 
   { icon: IconBids, label: "Bids", id: "bids" },
 
@@ -1787,11 +1809,16 @@ function DevSidebar({
   const visibleDevNavItems = useMemo(() => {
     try {
       if (appRole === "admin") {
-        return devNavItems.filter((i) => !["marketplace", "bids", "resumecheck"].includes(i.id));
+        // Admin keeps using the page switcher to reach Sprint Dashboard (and
+        // doesn't market/bid/resume-check as a dev), so this list stays as
+        // narrow as it always was — only the student-facing sidebar grew.
+        return studentNavItems
+          .filter((i) => !["marketplace", "bids", "resumecheck", "sprintoverview", "sprint"].includes(i.id))
+          .map((i) => (i.id === "profile" ? { ...i, label: "Dashboard" } : i));
       }
-      return devNavItems;
+      return studentNavItems;
     } catch {
-      return devNavItems;
+      return studentNavItems;
     }
   }, [appRole]);
 
@@ -3653,18 +3680,6 @@ function BidsView() {
 
 // ─── Sprint Dashboard ──────────────────────────────────────────────────────────
 
-const sprintNavItems = [
-  { icon: IconDashboard, label: "Dashboard", id: "dashboard" },
-
-  { icon: IconChart, label: "Sprint Dashboard", id: "sprint" },
-
-  { icon: IconBids, label: "Bids", id: "bids" },
-
-  { icon: IconMessages, label: "Messages", id: "messages" },
-
-  { icon: IconSettings, label: "Settings", id: "settings" },
-];
-
 const activityRoleLabel: Record<string, string> = {
   developer: "Developer",
   client: "Client",
@@ -3853,13 +3868,30 @@ function SprintSidebar({
   onNav,
 
   collapsed,
+
+  appRole,
 }: {
   active: string;
 
   onNav: (id: string) => void;
 
   collapsed: boolean;
+
+  appRole?: AppRole;
 }) {
+  // Mirrors DevSidebar's admin filtering: admin reaches Developer
+  // Profile/Marketplace/Resume Check via the page switcher, not from here,
+  // so this stays the same 5 items admin always saw (just relabeled).
+  const visibleItems = useMemo(() => {
+    try {
+      if (appRole === "admin") {
+        return studentNavItems.filter((i) => !["profile", "marketplace", "resumecheck"].includes(i.id));
+      }
+      return studentNavItems;
+    } catch {
+      return studentNavItems;
+    }
+  }, [appRole]);
   const project = useProjectStore();
 
   const profile = useDevProfile();
@@ -4013,7 +4045,7 @@ function SprintSidebar({
       )}
 
       <nav style={{ padding: "8px 0", flex: 1 }}>
-        {sprintNavItems.map(({ icon: Icon, label, id }) => {
+        {visibleItems.map(({ icon: Icon, label, id }) => {
           const isActive = active === id;
 
           return (
@@ -15264,8 +15296,10 @@ export default function App() {
   const visiblePages = useMemo<AppPage[]>(() => {
     try {
       if (!isAuthenticated) return [] as AppPage[];
-      // Best practice: enterprise sidebar-only — hide floating pill entirely
-      if (appRole === "enterprise") return [] as AppPage[];
+      // Best practice: enterprise and student are sidebar-only — hide floating
+      // pill entirely (their sidebars now carry every page, including the
+      // cross-page jump the switcher used to be the only way to make).
+      if (appRole === "enterprise" || appRole === "student") return [] as AppPage[];
 
       const allowed = getAllowedPages(appRole);
 
@@ -15583,9 +15617,14 @@ export default function App() {
                 }
               >
                 <DevSidebar
-                  active={devNav}
+                  active={devNav === "dashboard" ? "profile" : devNav}
                   onNav={(id) => {
-                    setDevNav(id);
+                    if (id === "sprintoverview" || id === "sprint") {
+                      setSprintNav(id === "sprint" ? "sprint" : "dashboard");
+                      setPage("sprint");
+                    } else {
+                      setDevNav(id === "profile" ? "dashboard" : id);
+                    }
 
                     setSidebarOpen(false);
                   }}
@@ -16002,13 +16041,21 @@ export default function App() {
                 }
               >
                 <SprintSidebar
-                  active={sprintNav}
+                  active={sprintNav === "dashboard" ? "sprintoverview" : sprintNav}
                   onNav={(id) => {
-                    setSprintNav(id);
+                    if (id === "sprintoverview") {
+                      setSprintNav("dashboard");
+                    } else if (id === "sprint") {
+                      setSprintNav("sprint");
+                    } else {
+                      setPage("developer");
+                      setDevNav(id === "profile" ? "dashboard" : id);
+                    }
 
                     setSidebarOpen(false);
                   }}
                   collapsed={collapsed}
+                  appRole={appRole}
                 />
               </div>
             )}
