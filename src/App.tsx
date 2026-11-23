@@ -10463,7 +10463,9 @@ function ClientOverview({ isMobile, onNavigate }: { isMobile: boolean; onNavigat
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
         <h1 style={{ margin: "0 0 6px", fontSize: isMobile ? 22 : 26, fontWeight: 700, color: "#0F172A", letterSpacing: "-0.03em" }}>Client Dashboard</h1>
-        <p style={{ margin: 0, fontSize: 13.5, color: "#64748B" }}>{client.business} · {client.barangay} · {client.permit}</p>
+        <p style={{ margin: 0, fontSize: 13.5, color: "#64748B" }}>
+          {[client.business, client.barangay, client.permit].filter(Boolean).join(" · ")}
+        </p>
       </div>
       <BidsReceivedPanel />
       {/* Contract/budget/activity cards show real data only — hidden for a
@@ -11310,6 +11312,11 @@ function MilestoneTrackingPage({
 
   const project = useProjectStore();
 
+  // A real user with no real contract loaded must never see the demo seed
+  // project's dispute/comment state (same mock-data-leak class fixed in
+  // SprintSidebar, ClientOverview, and ProjectContractsView).
+  const hasRealOrDemoProject = !getCachedAuthProfile() || isUsingRealContract();
+
   // The discussion panel below always centers on "the phase currently in
   // play" — the first not-yet-completed phase, or the last phase if every
   // phase is done.
@@ -11352,7 +11359,9 @@ function MilestoneTrackingPage({
     daysOverdue: p.client.daysLeft < 0 ? Math.abs(p.client.daysLeft) : 2,
   }));
 
-  const messages = project.phases.find((p) => p.number === discussionPhaseNumber)?.comments ?? [];
+  const messages = hasRealOrDemoProject
+    ? (project.phases.find((p) => p.number === discussionPhaseNumber)?.comments ?? [])
+    : [];
 
   function handleApprove(number: number) {
     // Error handling: guard approvePhase throw (e.g., corrupted project)
@@ -11403,7 +11412,7 @@ function MilestoneTrackingPage({
 
   const activePhase = clientPhases.find((p) => p.status === "review");
 
-  const hasDispute = clientPhases.some((p) => p.status === "disputed");
+  const hasDispute = hasRealOrDemoProject && clientPhases.some((p) => p.status === "disputed");
 
   const stacked = isMobile || isTablet;
 
