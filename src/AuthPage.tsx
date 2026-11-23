@@ -2111,6 +2111,45 @@ export default function AuthPage({ onSignedIn }: {
           </div>
         </div>
       </div>
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 40,
+          background: "#0F172A",
+          color: "#CBD5E1",
+          fontSize: 12,
+          padding: "10px 20px",
+          textAlign: "center",
+          lineHeight: 1.5,
+        }}
+      >
+        By using Startup-Match, you agree to our{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            setTosOpen(true)
+          }}
+          style={{ color: "#93C5FD", fontWeight: 600, textDecoration: "underline" }}
+        >
+          Terms of Service
+        </a>
+        , our{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            setEulaOpen(true)
+          }}
+          style={{ color: "#93C5FD", fontWeight: 600, textDecoration: "underline" }}
+        >
+          End User License Agreement
+        </a>
+        , and — for Enterprises posting a project — the Project Posting Terms shown at that step.
+      </div>
       {tosOpen && (
         <div
           role="dialog"
