@@ -15431,7 +15431,7 @@ export default function App() {
       if (resolved === "enterprise") {
         signInAsClient(email);
 
-        setPage("specform");
+        setPage("milestone");
       } else if (resolved === "admin") {
         signInAs(email);
 
@@ -16305,46 +16305,6 @@ export default function App() {
               </main>
             </div>
           </div>
-        )
-      ) : page === "specform" ? (
-        showPending ? (
-          <PendingVerification
-            role={appRole}
-            verification={activeVerification}
-            onLogout={handleLogout}
-          />
-        ) : (
-          /* ── Project Spec Form ───────────────────────────────────────── */
-
-          <ProjectSpecForm
-            isMobile={isMobile}
-            onBack={() => {
-              // Role-aware back: enterprise → milestone, student/admin → developer, fallback to first allowed
-
-              try {
-                if (appRole === "guest") {
-                  setPage("auth");
-
-                  return;
-                }
-
-                if (appRole === "enterprise") {
-                  setPage("milestone");
-
-                  return;
-                }
-
-                const allowed =
-                  ROLE_PAGE_MAP[appRole as Exclude<AppRole, "guest">];
-
-                if (allowed?.includes("developer")) setPage("developer");
-                else if (allowed?.[0]) setPage(allowed[0] as AppPage);
-                else setPage("auth");
-              } catch {
-                setPage("auth");
-              }
-            }}
-          />
         )
       ) : page === "milestone" ? (
         showPending ? (

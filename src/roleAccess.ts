@@ -10,7 +10,7 @@ import { getCachedAuthProfile } from "./supabaseAuth"
 
 // ─── Page & role types ────────────────────────────────────────────────────────
 // Keep in sync with `page` union in App.tsx.
-export type AppPage = "auth" | "developer" | "admin" | "sprint" | "specform" | "milestone" | "analytics"
+export type AppPage = "auth" | "developer" | "admin" | "sprint" | "milestone" | "analytics"
 export type AppRole = "guest" | "student" | "enterprise" | "admin"
 
 // ─── Page meta for switcher labels ───────────────────────────────────────────
@@ -20,7 +20,6 @@ export const PAGE_META: Record<AppPage, { label: string }> = {
   developer: { label: "Developer Profile" },
   admin: { label: "Admin — Verification Queue" },
   sprint: { label: "Sprint Dashboard" },
-  specform: { label: "Post a Project" },
   milestone: { label: "Milestone Tracking" },
   analytics: { label: "Analytics" },
 }
@@ -31,7 +30,6 @@ export const ALL_SWITCHER_PAGES: readonly AppPage[] = [
   "developer",
   "admin",
   "sprint",
-  "specform",
   "milestone",
   "analytics",
 ] as const
@@ -43,8 +41,8 @@ export const ALL_SWITCHER_PAGES: readonly AppPage[] = [
 // Toggle to restore spec-literal student milestone view: add 'milestone' to student[]
 export const ROLE_PAGE_MAP: Record<Exclude<AppRole, "guest">, AppPage[]> = {
   student: ["developer", "sprint"],
-  enterprise: ["specform", "milestone"],
-  admin: ["developer", "admin", "sprint", "specform", "milestone", "analytics"],
+  enterprise: ["milestone"],
+  admin: ["developer", "admin", "sprint", "milestone", "analytics"],
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
