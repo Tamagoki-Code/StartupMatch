@@ -53,6 +53,8 @@ import {
   loadRealContractForCurrentUser,
   clearRealContract,
   hasAttemptedContractLoad,
+  useContractSummaries,
+  selectContract,
 } from "./projectStore";
 
 import type { SprintPhaseStatus } from "./projectStore";
@@ -3976,6 +3978,7 @@ function SprintSidebar({
   // always the full student nav.
   const visibleItems = studentNavItems;
   const project = useProjectStore();
+  const contracts = useContractSummaries();
 
   const profile = useDevProfile();
 
@@ -4108,19 +4111,43 @@ function SprintSidebar({
           >
             Active Project
           </div>
-          <div
-            style={{
-              fontSize: 12,
+          {contracts.length > 1 ? (
+            <select
+              value={project.id}
+              onChange={(e) => selectContract(e.target.value)}
+              style={{
+                width: "100%",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#0F172A",
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              {contracts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title} {c.status === "Completed" ? "(Completed)" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div
+              style={{
+                fontSize: 12,
 
-              fontWeight: 600,
+                fontWeight: 600,
 
-              color: "#0F172A",
+                color: "#0F172A",
 
-              lineHeight: 1.3,
-            }}
-          >
-            {project.project}
-          </div>
+                lineHeight: 1.3,
+              }}
+            >
+              {project.project}
+            </div>
+          )}
           <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
             {project.client}
           </div>
@@ -8562,6 +8589,7 @@ function ProjectSpecForm({
 
         {/* User chip */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <NotificationBell />
           {!isMobile && (
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -10366,6 +10394,7 @@ function ClientSidebar({
 }) {
   const client = useClientProfile();
   const project = useProjectStore();
+  const contracts = useContractSummaries();
   const hasRealContract = isUsingRealContract();
   const showActiveContract = !getCachedAuthProfile() || hasRealContract;
   // Admin never renders this sidebar (it gets AdminSidebar instead, same as
@@ -10499,19 +10528,43 @@ function ClientSidebar({
           >
             Active Contract
           </div>
-          <div
-            style={{
-              fontSize: 12,
+          {hasRealContract && contracts.length > 1 ? (
+            <select
+              value={project.id}
+              onChange={(e) => selectContract(e.target.value)}
+              style={{
+                width: "100%",
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#0F172A",
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              {contracts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title} {c.status === "Completed" ? "(Completed)" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div
+              style={{
+                fontSize: 12,
 
-              fontWeight: 700,
+                fontWeight: 700,
 
-              color: "#0F172A",
+                color: "#0F172A",
 
-              lineHeight: 1.3,
-            }}
-          >
-            {hasRealContract ? project.project : "E-Commerce Inventory Portal"}
-          </div>
+                lineHeight: 1.3,
+              }}
+            >
+              {hasRealContract ? project.project : "E-Commerce Inventory Portal"}
+            </div>
+          )}
           <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
             {hasRealContract ? `${project.developer} · PSITS Dev` : "Marco Ramirez · PSITS Dev"}
           </div>
@@ -11718,6 +11771,16 @@ function MilestoneTrackingPage({
     : [];
 
   function handleApprove(number: number) {
+    // A moderator can override-approve on the client's behalf — confirm
+    // first, since this immediately releases real payment.
+    if (
+      appRole === "admin" &&
+      !window.confirm(
+        `Approve Sprint ${number} as PSITS Moderator? This immediately releases the milestone payment to the student, on the enterprise client's behalf.`,
+      )
+    ) {
+      return;
+    }
     // Error handling: guard approvePhase throw (e.g., corrupted project)
     try {
       approvePhase(number);
@@ -11727,6 +11790,14 @@ function MilestoneTrackingPage({
   }
 
   function handleDispute(number: number) {
+    if (
+      appRole === "admin" &&
+      !window.confirm(
+        `File this dispute as PSITS Moderator on Sprint ${number}? The student will be notified it was flagged by a moderator, not the client.`,
+      )
+    ) {
+      return;
+    }
     // Error handling: disputePhase may throw on bad note — keep UI consistent
     try {
       disputePhase(number, disputeNote);
@@ -15814,32 +15885,33 @@ export default function App() {
                   >
                     StartupMatch
                   </div>
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      marginLeft: "auto",
+                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                    <NotificationBell />
+                    <button
+                      onClick={handleLogout}
+                      style={{
+                        padding: "6px 12px",
 
-                      padding: "6px 12px",
+                        borderRadius: 6,
 
-                      borderRadius: 6,
+                        border: "1px solid #E2E8F0",
 
-                      border: "1px solid #E2E8F0",
+                        background: "#fff",
 
-                      background: "#fff",
+                        color: "#64748B",
 
-                      color: "#64748B",
+                        fontSize: 12,
 
-                      fontSize: 12,
+                        fontWeight: 600,
 
-                      fontWeight: 600,
+                        cursor: "pointer",
 
-                      cursor: "pointer",
-
-                      fontFamily: "Inter, sans-serif",
-                    }}
-                  >
-                    Logout
-                  </button>
+                        fontFamily: "Inter, sans-serif",
+                      }}
+                    >
+                      Logout
+                    </button>
+                  </div>
                 </div>
               )}
               {!isMobile && (
@@ -15847,11 +15919,16 @@ export default function App() {
                   style={{
                     display: "flex",
 
+                    alignItems: "center",
+
                     justifyContent: "flex-end",
+
+                    gap: 8,
 
                     padding: "12px 32px 0 32px",
                   }}
                 >
+                  <NotificationBell />
                   <button
                     onClick={handleLogout}
                     style={{

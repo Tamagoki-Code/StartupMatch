@@ -410,12 +410,34 @@ export function hasAttemptedContractLoad(): boolean {
   return contractLoadAttempted
 }
 
-async function refreshRealProject() {
+// Every contract this user is party to (id/title/status), for the Active
+// Contract switcher. fetchActiveContract only ever loads one contract's full
+// detail at a time — this is the list to pick from.
+let contractSummaries: realContracts.ContractSummary[] = []
+
+export function getContractSummaries(): realContracts.ContractSummary[] {
+  return contractSummaries
+}
+
+export function useContractSummaries(): realContracts.ContractSummary[] {
+  return useSyncExternalStore(subscribeProjectStore, getContractSummaries)
+}
+
+// Remembers which contract the user picked so a later refresh (after
+// approving a phase, adding a comment, etc.) reloads that same one instead
+// of silently reverting to the newest — refreshRealProject() with no
+// argument means "whatever's currently selected," not "always newest."
+let selectedContractId: string | undefined
+
+async function refreshRealProject(contractId?: string) {
+  if (contractId) selectedContractId = contractId
+
   try {
-    const sp = await realContracts.fetchActiveContract()
+    const sp = await realContracts.fetchActiveContract(contractId ?? selectedContractId)
     if (sp) {
       realActive = true
       project = sp
+      selectedContractId = sp.id
     } else {
       realActive = false
     }
@@ -423,7 +445,28 @@ async function refreshRealProject() {
     realActive = false
   }
   contractLoadAttempted = true
+
+  if (realActive) {
+    // Best-effort, non-blocking: the switcher list shouldn't delay or break
+    // loading the contract itself.
+    realContracts
+      .fetchMyContractSummaries()
+      .then((list) => {
+        contractSummaries = list
+        emit()
+      })
+      .catch(() => {})
+  } else {
+    contractSummaries = []
+  }
+
   emit()
+}
+
+// Switches the loaded contract to a specific one from the summaries list
+// (e.g. the Active Contract dropdown) rather than always the newest.
+export function selectContract(contractId: string) {
+  void refreshRealProject(contractId)
 }
 
 // Call after sign-in (or on demand) to load/refresh the current user's real
@@ -436,6 +479,8 @@ export function loadRealContractForCurrentUser() {
 export function clearRealContract() {
   contractLoadAttempted = false
   realActive = false
+  contractSummaries = []
+  selectedContractId = undefined
   realContracts.clearActiveContract()
   project = JSON.parse(JSON.stringify(seedProject)) as SprintProject
   emit()
@@ -591,7 +636,7 @@ export function formatPeso(n: number) {
 
 export function submitPhase(number: number, repoLink: string, notes: string) {
   if (realActive) {
-    realContracts.submitPhase(number, repoLink, notes).then(refreshRealProject).catch(() => {})
+    realContracts.submitPhase(number, repoLink, notes).then(() => refreshRealProject()).catch(() => {})
     return
   }
 
@@ -619,7 +664,7 @@ export function submitPhase(number: number, repoLink: string, notes: string) {
 
 export function resubmitPhase(number: number, repoLink: string, notes: string) {
   if (realActive) {
-    realContracts.resubmitPhase(number, repoLink, notes).then(refreshRealProject).catch(() => {})
+    realContracts.resubmitPhase(number, repoLink, notes).then(() => refreshRealProject()).catch(() => {})
     return
   }
 
@@ -649,7 +694,7 @@ export function resubmitPhase(number: number, repoLink: string, notes: string) {
 
 export function reviseSubmission(number: number) {
   if (realActive) {
-    realContracts.reviseSubmission(number).then(refreshRealProject).catch(() => {})
+    realContracts.reviseSubmission(number).then(() => refreshRealProject()).catch(() => {})
     return
   }
 
@@ -743,7 +788,7 @@ export function addTask(number: number, label: string) {
     }))
     // Reconciles the temp id with the real one once the write lands — UI
     // already reflects the add, so this refresh is invisible either way.
-    realContracts.addTask(number, label).then(refreshRealProject).catch(() => void refreshRealProject())
+    realContracts.addTask(number, label).then(() => refreshRealProject()).catch(() => void refreshRealProject())
     return
   }
 
@@ -793,7 +838,7 @@ export function addComment(number: number, text: string, role: CommentRole) {
   }
 
   if (realActive) {
-    realContracts.addComment(number, text, role).then(refreshRealProject).catch(() => {})
+    realContracts.addComment(number, text, role).then(() => refreshRealProject()).catch(() => {})
     return
   }
 
@@ -849,7 +894,7 @@ export function deleteComment(number: number, commentId: string) {
 
 export function approvePhase(number: number, score = 5) {
   if (realActive) {
-    realContracts.approvePhase(number, score).then(refreshRealProject).catch(() => {})
+    realContracts.approvePhase(number, score).then(() => refreshRealProject()).catch(() => {})
     return
   }
 
@@ -880,7 +925,7 @@ export function approvePhase(number: number, score = 5) {
 
 export function disputePhase(number: number, note: string) {
   if (realActive) {
-    realContracts.disputePhase(number, note).then(refreshRealProject).catch(() => {})
+    realContracts.disputePhase(number, note).then(() => refreshRealProject()).catch(() => {})
     return
   }
 
@@ -904,7 +949,7 @@ export function disputePhase(number: number, note: string) {
 
 export function markNotificationRead(id: string) {
   if (realActive) {
-    realContracts.markNotificationRead(id).then(refreshRealProject).catch(() => {})
+    realContracts.markNotificationRead(id).then(() => refreshRealProject()).catch(() => {})
     return
   }
   if (!mockMutationAllowed()) return
@@ -922,7 +967,7 @@ export function markNotificationRead(id: string) {
 
 export function markAllNotificationsRead() {
   if (realActive) {
-    realContracts.markAllNotificationsRead().then(refreshRealProject).catch(() => {})
+    realContracts.markAllNotificationsRead().then(() => refreshRealProject()).catch(() => {})
     return
   }
   if (!mockMutationAllowed()) return

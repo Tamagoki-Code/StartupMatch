@@ -118,16 +118,10 @@ interface RawPhaseRow {
   client_updates: string | null
 }
 
-// Finds "the" active contract for this user — the most recently started
-// contract that isn't fully wrapped up, or else the most recent one overall.
-// (The UI, inherited from the original mock, only ever shows one contract at
-// a time; a real multi-contract switcher is future work.)
-export async function fetchActiveContract(): Promise<SprintProject | null> {
-  const me = getCachedAuthProfile()
-  if (!me) return null
-
-  let contractRows: RawContractRow[] = []
-
+// Every contract id/project_id this user is party to, newest first — shared
+// by fetchActiveContract (which needs the full list to pick one) and
+// fetchMyContractSummaries (which needs it for the switcher dropdown).
+async function fetchMyContractRows(me: { id: string; role: string }): Promise<RawContractRow[]> {
   if (me.role === "enterprise") {
     const { data: myProjects, error: projErr } = await supabase
       .from("marketplace_projects")
@@ -135,7 +129,7 @@ export async function fetchActiveContract(): Promise<SprintProject | null> {
       .eq("enterprise_id", me.id)
     if (projErr) throw projErr
     const projectIds = (myProjects ?? []).map((p) => p.id)
-    if (projectIds.length === 0) return null
+    if (projectIds.length === 0) return []
 
     const { data, error } = await supabase
       .from("contracts")
@@ -143,23 +137,65 @@ export async function fetchActiveContract(): Promise<SprintProject | null> {
       .in("project_id", projectIds)
       .order("started", { ascending: false })
     if (error) throw error
-    contractRows = data ?? []
-  } else {
-    const { data, error } = await supabase
-      .from("contracts")
-      .select("*")
-      .eq("student_id", me.id)
-      .order("started", { ascending: false })
-    if (error) throw error
-    contractRows = data ?? []
+    return data ?? []
   }
+
+  const { data, error } = await supabase
+    .from("contracts")
+    .select("*")
+    .eq("student_id", me.id)
+    .order("started", { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export interface ContractSummary {
+  id: string
+  title: string
+  status: "Active" | "Completed"
+}
+
+// Lists every contract this user is party to, for the Active Contract
+// switcher — fetchActiveContract only ever loads one contract's full detail
+// at a time, so a user with more than one real contract needs this to pick
+// among them (the first version silently only ever showed the newest one).
+export async function fetchMyContractSummaries(): Promise<ContractSummary[]> {
+  const me = getCachedAuthProfile()
+  if (!me) return []
+
+  const contractRows = await fetchMyContractRows(me)
+  if (contractRows.length === 0) return []
+
+  const projectIds = [...new Set(contractRows.map((c) => c.project_id))]
+  const { data: projects, error } = await supabase
+    .from("marketplace_projects")
+    .select("id, title")
+    .in("id", projectIds)
+  if (error) throw error
+  const titleById = new Map((projects ?? []).map((p) => [p.id, p.title as string]))
+
+  return contractRows.map((c) => ({
+    id: c.id,
+    title: titleById.get(c.project_id) || "Untitled Project",
+    status: c.paid_to_date >= c.total_budget ? "Completed" : "Active",
+  }))
+}
+
+// Loads one contract's full detail — the one matching `contractId`, or (when
+// omitted, or not found among this user's contracts) the most recently
+// started one, same as the original single-contract behavior.
+export async function fetchActiveContract(contractId?: string): Promise<SprintProject | null> {
+  const me = getCachedAuthProfile()
+  if (!me) return null
+
+  const contractRows = await fetchMyContractRows(me)
 
   if (contractRows.length === 0) {
     meta = null
     return null
   }
 
-  const contractRow = contractRows[0]
+  const contractRow = (contractId && contractRows.find((c) => c.id === contractId)) || contractRows[0]
 
   const { data: project, error: projectErr } = await supabase
     .from("marketplace_projects")
@@ -459,9 +495,18 @@ function formatPeso(n: number): string {
   return `₱${n.toLocaleString("en-US")}`
 }
 
+// A moderator can approve/dispute on a client's behalf (RLS allows it, for
+// dispute-resolution override) — the notification and comment attribution
+// must say who really acted, not always claim it was the client, or the
+// student is told a lie about who approved/disputed their work.
+function actingAsModerator(): boolean {
+  return getCachedAuthProfile()?.role === "admin"
+}
+
 export async function approvePhase(number: number, score = 5) {
   const m = requireMeta()
   const phaseId = await getPhaseId(number)
+  const byModerator = actingAsModerator()
 
   const { error: phaseErr } = await supabase
     .from("contract_phases")
@@ -477,7 +522,8 @@ export async function approvePhase(number: number, score = 5) {
   if (contractErr) throw contractErr
   meta = { ...m, paidToDate: newPaidToDate }
 
-  await notify(m.studentId, "success", `Milestone Approved: Client verified Phase ${number}. Phase score: ${score}/5.`)
+  const approver = byModerator ? "A PSITS Moderator" : "Client"
+  await notify(m.studentId, "success", `Milestone Approved: ${approver} verified Phase ${number}. Phase score: ${score}/5.`)
   await notify(
     m.studentId,
     "success",
@@ -488,6 +534,7 @@ export async function approvePhase(number: number, score = 5) {
 export async function disputePhase(number: number, note: string) {
   const m = requireMeta()
   const phaseId = await getPhaseId(number)
+  const byModerator = actingAsModerator()
 
   const { error } = await supabase
     .from("contract_phases")
@@ -496,10 +543,11 @@ export async function disputePhase(number: number, note: string) {
   if (error) throw error
 
   if (note) {
-    await addComment(number, note, "client")
+    await addComment(number, note, byModerator ? "admin" : "client")
   }
 
-  await notify(m.studentId, "warning", `Client flagged Sprint ${number} for dispute / revision. Review the feedback and resubmit.`)
+  const flagger = byModerator ? "A PSITS Moderator" : "Client"
+  await notify(m.studentId, "warning", `${flagger} flagged Sprint ${number} for dispute / revision. Review the feedback and resubmit.`)
 }
 
 // ─── Notifications (both sides) ─────────────────────────────────────────────
