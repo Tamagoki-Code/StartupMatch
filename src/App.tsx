@@ -1507,7 +1507,7 @@ function RealAccountsPanel({
                       borderBottom: i < filtered.length - 1 ? "1px solid #F1F5F9" : "none",
                     }}
                   >
-                    <td style={{ padding: "13px 16px", fontWeight: 600, color: "#0F172A" }}>
+                    <td style={{ padding: "13px 16px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap" }}>
                       <span
                         title={isRecentlyActive(p.lastSeenAt) ? "Online now" : p.lastSeenAt ? `Last seen ${new Date(p.lastSeenAt).toLocaleString()}` : "Never signed in"}
                         style={{
@@ -1521,7 +1521,7 @@ function RealAccountsPanel({
                       />
                       {p.name} {isSelf && <span style={{ color: "#94A3B8", fontWeight: 500 }}>(you)</span>}
                     </td>
-                    <td style={{ padding: "13px 16px", color: "#475569" }}>{p.email}</td>
+                    <td style={{ padding: "13px 16px", color: "#475569", whiteSpace: "nowrap" }}>{p.email}</td>
                     <td style={{ padding: "13px 16px", color: "#475569", textTransform: "capitalize" }}>
                       {p.role}
                     </td>
@@ -3041,11 +3041,13 @@ function DeveloperProfile({
                       fontWeight: 600,
 
                       color: "#0F172A",
+
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {proj.name}
                   </td>
-                  <td style={{ padding: "14px 24px", color: "#475569" }}>
+                  <td style={{ padding: "14px 24px", color: "#475569", whiteSpace: "nowrap" }}>
                     {proj.client}
                   </td>
                   <td
@@ -3725,11 +3727,13 @@ function BidsView() {
                         fontWeight: 600,
 
                         color: "#0F172A",
+
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {bid.project}
                     </td>
-                    <td style={{ padding: "14px 20px", color: "#475569" }}>
+                    <td style={{ padding: "14px 20px", color: "#475569", whiteSpace: "nowrap" }}>
                       {bid.client}
                     </td>
                     <td
@@ -8818,10 +8822,11 @@ function ProjectSpecForm({
                       key={d.id}
                       style={{
                         display: "flex",
-                        alignItems: "center",
+                        flexDirection: isMobile ? "column" : "row",
+                        alignItems: isMobile ? "flex-start" : "center",
                         justifyContent: "space-between",
-                        gap: 10,
-                        padding: "8px 12px",
+                        gap: isMobile ? 10 : 10,
+                        padding: "10px 12px",
                         background: "#fff",
                         border: "1px solid #E2E8F0",
                         borderRadius: 8,
@@ -8835,7 +8840,7 @@ function ProjectSpecForm({
                           {d.budget} · Saved {d.savedAt}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, width: isMobile ? "100%" : "auto" }}>
                         <button
                           onClick={() => handlePublishDraft(d.id)}
                           style={{
@@ -8848,6 +8853,7 @@ function ProjectSpecForm({
                             fontWeight: 600,
                             cursor: "pointer",
                             fontFamily: "Inter, sans-serif",
+                            flex: isMobile ? 1 : "unset",
                           }}
                         >
                           Publish
@@ -8864,6 +8870,7 @@ function ProjectSpecForm({
                             fontWeight: 600,
                             cursor: "pointer",
                             fontFamily: "Inter, sans-serif",
+                            flex: isMobile ? 1 : "unset",
                           }}
                         >
                           Delete
@@ -10891,11 +10898,11 @@ function ProjectContractsView({ onPostProject, isMobile }: { onPostProject: () =
               <tbody>
                 {contracts.map((c) => (
                   <tr key={c.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                    <td style={{ padding: "14px 16px", fontWeight: 600, color: "#0F172A" }}>{c.title}</td>
-                    <td style={{ padding: "14px 16px", color: "#475569" }}>{c.client}</td>
-                    <td style={{ padding: "14px 16px", color: "#64748B" }}>{c.date}</td>
+                    <td style={{ padding: "14px 16px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap" }}>{c.title}</td>
+                    <td style={{ padding: "14px 16px", color: "#475569", whiteSpace: "nowrap" }}>{c.client}</td>
+                    <td style={{ padding: "14px 16px", color: "#64748B", whiteSpace: "nowrap" }}>{c.date}</td>
                     <td style={{ padding: "14px 16px" }}><StatusPill status={c.status} /></td>
-                    <td style={{ padding: "14px 16px", color: "#0F172A", fontWeight: 600 }}>{c.budget}</td>
+                    <td style={{ padding: "14px 16px", color: "#0F172A", fontWeight: 600, whiteSpace: "nowrap" }}>{c.budget}</td>
                     <td style={{ padding: "14px 16px", color: "#475569" }}>{c.bidCount}</td>
                   </tr>
                 ))}
@@ -11871,21 +11878,23 @@ function MilestoneTrackingPage({
               </button>
             )}
             <div>
-              <div
-                style={{
-                  fontSize: 11,
+              {!isMobile && (
+                <div
+                  style={{
+                    fontSize: 11,
 
-                  color: "#94A3B8",
+                    color: "#94A3B8",
 
-                  fontWeight: 600,
+                    fontWeight: 600,
 
-                  textTransform: "uppercase",
+                    textTransform: "uppercase",
 
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {appRole === "admin" ? "Regional Admin Dashboard" : "Enterprise Client Portal"}
-              </div>
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {appRole === "admin" ? "Regional Admin Dashboard" : "Enterprise Client Portal"}
+                </div>
+              )}
               <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>
                 Milestone Tracking
               </div>
@@ -13935,7 +13944,7 @@ function AuditTable({ rows }: { rows: AuditLogRow[] }) {
               >
                 {row.ts}
               </td>
-              <td style={{ padding: "13px 18px", fontWeight: 600, color: "#0F172A" }}>{row.event}</td>
+              <td style={{ padding: "13px 18px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap" }}>{row.event}</td>
               <td style={{ padding: "13px 18px", color: "#64748B" }}>
                 <span
                   style={{
@@ -14264,21 +14273,23 @@ function EnterpriseAnalyticsPage({
               </button>
             )}
             <div>
-              <div
-                style={{
-                  fontSize: 11,
+              {!isMobile && (
+                <div
+                  style={{
+                    fontSize: 11,
 
-                  color: "#94A3B8",
+                    color: "#94A3B8",
 
-                  fontWeight: 600,
+                    fontWeight: 600,
 
-                  textTransform: "uppercase",
+                    textTransform: "uppercase",
 
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Regional Admin Dashboard
-              </div>
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Regional Admin Dashboard
+                </div>
+              )}
               <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>
                 Enterprise Analytics
               </div>
@@ -15991,21 +16002,23 @@ export default function App() {
                   </button>
                 )}
                 <div>
-                  <div
-                    style={{
-                      fontSize: 11,
+                  {!isMobile && (
+                    <div
+                      style={{
+                        fontSize: 11,
 
-                      color: "#94A3B8",
+                        color: "#94A3B8",
 
-                      fontWeight: 600,
+                        fontWeight: 600,
 
-                      textTransform: "uppercase",
+                        textTransform: "uppercase",
 
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Regional Admin Dashboard
-                  </div>
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Regional Admin Dashboard
+                    </div>
+                  )}
                   <div
                     style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}
                   >
@@ -16240,21 +16253,23 @@ export default function App() {
                     </button>
                   )}
                   <div>
-                    <div
-                      style={{
-                        fontSize: 11,
+                    {!isMobile && (
+                      <div
+                        style={{
+                          fontSize: 11,
 
-                        color: "#94A3B8",
+                          color: "#94A3B8",
 
-                        fontWeight: 600,
+                          fontWeight: 600,
 
-                        textTransform: "uppercase",
+                          textTransform: "uppercase",
 
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      {appRole === "admin" ? "Regional Admin Dashboard" : "Student Developer Module"}
-                    </div>
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        {appRole === "admin" ? "Regional Admin Dashboard" : "Student Developer Module"}
+                      </div>
+                    )}
                     <div
                       style={{
                         fontSize: 15,
