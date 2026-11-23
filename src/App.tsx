@@ -10476,7 +10476,7 @@ function ClientSidebar({
               StartupMatch
             </div>
             <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>
-              Enterprise Client Portal
+              {appRole === "admin" ? "Regional Admin · Tagum" : "Enterprise Client Portal"}
             </div>
           </div>
         )}
@@ -11898,7 +11898,7 @@ function MilestoneTrackingPage({
                   letterSpacing: "0.05em",
                 }}
               >
-                Enterprise Client Portal
+                {appRole === "admin" ? "Regional Admin Dashboard" : "Enterprise Client Portal"}
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A" }}>
                 Milestone Tracking
@@ -16267,7 +16267,7 @@ export default function App() {
                         letterSpacing: "0.05em",
                       }}
                     >
-                      Student Developer Module
+                      {appRole === "admin" ? "Regional Admin Dashboard" : "Student Developer Module"}
                     </div>
                     <div
                       style={{
