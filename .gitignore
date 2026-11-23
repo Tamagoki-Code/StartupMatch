@@ -13,3 +13,4 @@ logs/
 .tmp-*
 supabase/.temp/
 Startup match algorithm/
+supabase/migrations/20260908210000_grant_test_account_full_access.sql
