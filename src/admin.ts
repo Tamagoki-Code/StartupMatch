@@ -69,6 +69,99 @@ export function useAllProfiles() {
   return { profiles, loading, error, refresh }
 }
 
+// ─── All-projects sprint progress (Sprint Dashboard, admin view) ───────────
+// Admin has no contract of their own, so the Sprint Dashboard page would
+// otherwise just show "no active contract" forever. This gives moderators
+// the oversight view the role actually needs: every real contract's phase
+// progress at a glance. RLS already grants admin full read on these tables.
+
+export interface AdminContractProgressRow {
+  contractId: string
+  projectTitle: string
+  studentName: string
+  businessName: string
+  totalPhases: number
+  completedPhases: number
+  currentPhaseStatus: string | null
+  currentPhaseNumber: number | null
+  deadline: string | null
+}
+
+async function fetchAllContractProgress(): Promise<AdminContractProgressRow[]> {
+  const { data: contracts, error: cErr } = await supabase
+    .from("contracts")
+    .select("id, project_id, student_id, total_phases, deadline")
+    .order("started", { ascending: false })
+  if (cErr) throw cErr
+  if (!contracts || contracts.length === 0) return []
+
+  const projectIds = [...new Set(contracts.map((c) => c.project_id))]
+  const studentIds = [...new Set(contracts.map((c) => c.student_id))]
+  const contractIds = contracts.map((c) => c.id)
+
+  const [projectsRes, studentsRes, phasesRes] = await Promise.all([
+    supabase.from("marketplace_projects").select("id, title, enterprise_id").in("id", projectIds),
+    supabase.from("profiles").select("id, name").in("id", studentIds),
+    supabase.from("contract_phases").select("contract_id, number, status").in("contract_id", contractIds),
+  ])
+  if (projectsRes.error) throw projectsRes.error
+  if (studentsRes.error) throw studentsRes.error
+  if (phasesRes.error) throw phasesRes.error
+
+  const enterpriseIds = [...new Set((projectsRes.data ?? []).map((p) => p.enterprise_id))]
+  const { data: enterpriseProfiles, error: eErr } = await supabase
+    .from("enterprise_profiles")
+    .select("profile_id, business")
+    .in("profile_id", enterpriseIds)
+  if (eErr) throw eErr
+
+  const projectById = new Map((projectsRes.data ?? []).map((p) => [p.id, p]))
+  const studentNameById = new Map((studentsRes.data ?? []).map((s) => [s.id, s.name as string]))
+  const businessByEnterprise = new Map((enterpriseProfiles ?? []).map((e) => [e.profile_id, e.business as string]))
+
+  return contracts.map((c) => {
+    const phases = (phasesRes.data ?? [])
+      .filter((p) => p.contract_id === c.id)
+      .sort((a, b) => a.number - b.number)
+    const completedPhases = phases.filter((p) => p.status === "completed").length
+    const current = phases.find((p) => p.status !== "completed") ?? phases[phases.length - 1] ?? null
+    const project = projectById.get(c.project_id)
+
+    return {
+      contractId: c.id,
+      projectTitle: project?.title ?? "Untitled Project",
+      studentName: studentNameById.get(c.student_id) ?? "Unknown",
+      businessName: project ? businessByEnterprise.get(project.enterprise_id) ?? "Unknown Business" : "Unknown Business",
+      totalPhases: c.total_phases,
+      completedPhases,
+      currentPhaseStatus: current?.status ?? null,
+      currentPhaseNumber: current?.number ?? null,
+      deadline: c.deadline,
+    }
+  })
+}
+
+export function useAllContractProgress() {
+  const [rows, setRows] = useState<AdminContractProgressRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    fetchAllContractProgress()
+      .then(setRows)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load sprint progress"))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  return { rows, loading, error, refresh }
+}
+
 export async function setVerificationStatus(
   profileId: string,
   status: AdminProfileRow["verificationStatus"],

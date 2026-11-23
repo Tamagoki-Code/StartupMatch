@@ -24,12 +24,13 @@ import {
   setAvailability,
   updateDevProfile,
   updateDevIdentity,
+  updateDevLinks,
   MARKETPLACE_PROJECTS,
   loadRealDevProfileForCurrentUser,
   clearRealDevProfile,
 } from "./devProfile";
 
-import type { DevProject } from "./devProfile";
+import type { DevProject, DevLink } from "./devProfile";
 
 import {
   useProjectStore,
@@ -97,8 +98,8 @@ import {
 } from "./marketplace";
 import type { DraftProject, PostedProject } from "./marketplace";
 
-import { useAllProfiles, setVerificationStatus, promoteToAdmin } from "./admin";
-import type { AdminProfileRow } from "./admin";
+import { useAllProfiles, setVerificationStatus, promoteToAdmin, useAllContractProgress } from "./admin";
+import type { AdminProfileRow, AdminContractProgressRow } from "./admin";
 import { usePlatformAnalytics } from "./analytics";
 import { useAuditLog } from "./auditLog";
 import type { AuditLogRow, AuditStatus } from "./auditLog";
@@ -2158,15 +2159,24 @@ function EditPortfolioModal({
   onSave,
   initialSkills,
   initialTools,
+  initialLinks,
+  onSaveLinks,
 }: {
   onClose: () => void;
   onSave: (skills: string[], tools: string[]) => void;
   initialSkills: string[];
   initialTools: string[];
+  initialLinks: DevLink[];
+  onSaveLinks: (links: { icon: DevLink["icon"]; href: string }[]) => void;
 }) {
   // Best practice: guard null/undefined initials from corrupted storage — Clarification 1 keeps no duplicate limit
   const [skillsText, setSkillsText] = useState(() => (Array.isArray(initialSkills) ? initialSkills : []).join(", "));
   const [toolsText, setToolsText] = useState(() => (Array.isArray(initialTools) ? initialTools : []).join(", "));
+  const linkByIcon = (icon: DevLink["icon"]) =>
+    (Array.isArray(initialLinks) ? initialLinks : []).find((l) => l.icon === icon)?.href ?? "";
+  const [githubUrl, setGithubUrl] = useState(() => linkByIcon("github"));
+  const [linkedinUrl, setLinkedinUrl] = useState(() => linkByIcon("linkedin"));
+  const [websiteUrl, setWebsiteUrl] = useState(() => linkByIcon("globe"));
   const [saveError, setSaveError] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -2248,6 +2258,47 @@ function EditPortfolioModal({
               style={{ width: "100%", minHeight: 70, padding: "10px 12px", border: "1px solid #E2E8F0", borderRadius: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: "#334155", resize: "vertical", boxSizing: "border-box" }}
             />
           </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Links & Repositories</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#94A3B8", lineHeight: 0 }}>
+                  <IconGithub size={15} />
+                </span>
+                <input
+                  type="url"
+                  value={githubUrl}
+                  onChange={(e) => setGithubUrl(e.target.value)}
+                  placeholder="https://github.com/your-username"
+                  style={{ width: "100%", padding: "9px 12px 9px 34px", border: "1px solid #E2E8F0", borderRadius: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: "#334155", boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#94A3B8", lineHeight: 0 }}>
+                  <IconLinkedin size={15} />
+                </span>
+                <input
+                  type="url"
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="https://linkedin.com/in/your-name"
+                  style={{ width: "100%", padding: "9px 12px 9px 34px", border: "1px solid #E2E8F0", borderRadius: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: "#334155", boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#94A3B8", lineHeight: 0 }}>
+                  <IconGlobe size={15} />
+                </span>
+                <input
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="https://your-portfolio.com"
+                  style={{ width: "100%", padding: "9px 12px 9px 34px", border: "1px solid #E2E8F0", borderRadius: 8, fontFamily: "Inter, sans-serif", fontSize: 13, color: "#334155", boxSizing: "border-box" }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
         <div style={{ padding: "16px 24px", borderTop: "1px solid #F1F5F9", display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ background: "transparent", color: "#475569", border: "1px solid #E2E8F0", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>Cancel</button>
@@ -2260,6 +2311,11 @@ function EditPortfolioModal({
                 const tools = typeof toolsText === "string" ? toolsText.split(",").map((s) => s.trim()).filter(Boolean) : [];
                 // Intentionally no duplicate/length limit per Clarification 1 — keep simple split
                 onSave(skills, tools);
+                onSaveLinks([
+                  { icon: "github", href: githubUrl },
+                  { icon: "linkedin", href: linkedinUrl },
+                  { icon: "globe", href: websiteUrl },
+                ]);
                 onClose();
               } catch (e) {
                 setSaveError(e instanceof Error ? e.message : "Failed to save — please retry");
@@ -2807,8 +2863,10 @@ function DeveloperProfile({
             <EditPortfolioModal
               initialSkills={p.skills}
               initialTools={p.tools}
+              initialLinks={p.links}
               onClose={() => setEditOpen(false)}
               onSave={(skills, tools) => updateDevProfile({ skills, tools })}
+              onSaveLinks={(links) => updateDevLinks(links)}
             />
           )}
         </div>
@@ -4289,14 +4347,132 @@ function SprintSidebar({
   );
 }
 
+// ─── Admin Sprint Progress (oversight view, replaces the Sprint Dashboard's
+// "no active contract" dead end for a moderator) ────────────────────────────
+
+const PHASE_STATUS_LABEL: Record<string, string> = {
+  completed: "Completed",
+  active: "In Progress",
+  in_review: "Awaiting Client Review",
+  disputed: "Disputed",
+  revision: "Needs Revision",
+  upcoming: "Not Started",
+};
+
+const PHASE_STATUS_COLOR: Record<string, string> = {
+  completed: "#16A34A",
+  active: "#2563EB",
+  in_review: "#2563EB",
+  disputed: "#DC2626",
+  revision: "#D97706",
+  upcoming: "#94A3B8",
+};
+
+function AdminSprintProgressView() {
+  const { rows, loading, error } = useAllContractProgress();
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div>
+        <h1 style={{ margin: "0 0 6px", fontSize: 24, fontWeight: 700, color: "#0F172A", letterSpacing: "-0.03em" }}>
+          Sprint Dashboard
+        </h1>
+        <p style={{ margin: 0, fontSize: 13.5, color: "#64748B" }}>
+          Phase progress across every active contract on the platform.
+        </p>
+      </div>
+      <Card style={{ overflow: "hidden" }}>
+        {loading ? (
+          <EmptyState message="Loading sprint progress…" />
+        ) : error ? (
+          <EmptyState message={`Failed to load: ${error}`} />
+        ) : rows.length === 0 ? (
+          <EmptyState message="No active contracts yet. They'll show up here once a bid is awarded." />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#F8FAFC" }}>
+                  {["Project", "Student", "Business", "Progress", "Current Phase"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "10px 16px",
+                        textAlign: "left",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "#94A3B8",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        borderBottom: "1px solid #E2E8F0",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r: AdminContractProgressRow) => (
+                  <tr key={r.contractId} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "13px 16px", fontWeight: 600, color: "#0F172A", whiteSpace: "nowrap" }}>
+                      {r.projectTitle}
+                    </td>
+                    <td style={{ padding: "13px 16px", color: "#475569", whiteSpace: "nowrap" }}>{r.studentName}</td>
+                    <td style={{ padding: "13px 16px", color: "#475569", whiteSpace: "nowrap" }}>{r.businessName}</td>
+                    <td style={{ padding: "13px 16px", color: "#0F172A", whiteSpace: "nowrap" }}>
+                      {r.completedPhases}/{r.totalPhases} phases
+                    </td>
+                    <td style={{ padding: "13px 16px", whiteSpace: "nowrap" }}>
+                      {r.currentPhaseStatus ? (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: PHASE_STATUS_COLOR[r.currentPhaseStatus] ?? "#64748B",
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: PHASE_STATUS_COLOR[r.currentPhaseStatus] ?? "#94A3B8",
+                            }}
+                          />
+                          Sprint {r.currentPhaseNumber}: {PHASE_STATUS_LABEL[r.currentPhaseStatus] ?? r.currentPhaseStatus}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 function SprintDashboard({
   isMobile,
 
   isTablet,
+
+  appRole,
 }: {
   isMobile: boolean;
 
   isTablet: boolean;
+
+  appRole?: AppRole;
 }) {
   const project = useProjectStore();
 
@@ -4307,6 +4483,12 @@ function SprintDashboard({
   const [taskInput, setTaskInput] = useState<Record<number, string>>({});
 
   const [commentInput, setCommentInput] = useState<Record<number, string>>({});
+
+  // Admin has no contract of their own — give them the oversight view
+  // instead of the "no active contract" dead end every other viewer gets.
+  if (appRole === "admin") {
+    return <AdminSprintProgressView />;
+  }
 
   // A real account with no awarded contract yet has nothing to show here —
   // don't display the demo project as if it were theirs.
@@ -13446,6 +13628,48 @@ function MilestoneTrackingPage({
                                   </svg>
                                   Flag for Dispute / Request Revision
                                 </button>
+                                <button
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        `Cancel the review on Sprint ${phase.num}? This sends it back to the student unreviewed — no approval or dispute is recorded, and they'll need to resubmit.`,
+                                      )
+                                    ) {
+                                      reviseSubmission(phase.num);
+                                    }
+                                  }}
+                                  style={{
+                                    flex: stacked ? "1 1 100%" : "unset",
+
+                                    display: "flex",
+
+                                    alignItems: "center",
+
+                                    justifyContent: "center",
+
+                                    gap: 8,
+
+                                    padding: "11px 20px",
+
+                                    borderRadius: 8,
+
+                                    background: "transparent",
+
+                                    color: "#64748B",
+
+                                    border: "1.5px solid #E2E8F0",
+
+                                    fontSize: 14,
+
+                                    fontWeight: 600,
+
+                                    cursor: "pointer",
+
+                                    fontFamily: "Inter, sans-serif",
+                                  }}
+                                >
+                                  Cancel Review
+                                </button>
                               </div>
                             )}
                           </>
@@ -16511,7 +16735,7 @@ export default function App() {
                     onNavigate={() => setSprintNav("sprint")}
                   />
                 ) : sprintNav === "sprint" ? (
-                  <SprintDashboard isMobile={isMobile} isTablet={isTablet} />
+                  <SprintDashboard isMobile={isMobile} isTablet={isTablet} appRole={appRole} />
                 ) : sprintNav === "bids" ? (
                   <BidsView />
                 ) : sprintNav === "messages" ? (

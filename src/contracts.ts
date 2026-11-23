@@ -409,12 +409,21 @@ export async function resubmitPhase(number: number, repoLink: string, notes: str
 }
 
 export async function reviseSubmission(number: number) {
+  const m = requireMeta()
   const phaseId = await getPhaseId(number)
   const { error } = await supabase
     .from("contract_phases")
     .update({ status: "active", submitted_at: null })
     .eq("id", phaseId)
   if (error) throw error
+
+  // Only notify when someone other than the student withdrew it on their
+  // behalf (the client's "Cancel Review") — the student doesn't need a
+  // notification for their own action.
+  const me = getCachedAuthProfile()
+  if (me && me.id !== m.studentId) {
+    await notify(m.studentId, "info", `Sprint ${number}'s review was canceled before a decision — no approval or dispute was recorded. Please resubmit when ready.`)
+  }
 }
 
 export async function updateRepoLink(number: number, url: string) {

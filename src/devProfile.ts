@@ -828,6 +828,40 @@ export function updateDevProfile(patch: Partial<DeveloperProfileData>) {
   }
 }
 
+// Links & Repositories (GitHub / LinkedIn / portfolio) — full-replace, same
+// pattern as skills/tools: local state first, then best-effort persistence.
+export function updateDevLinks(links: { icon: DevLink["icon"]; href: string }[]) {
+  try {
+    const labelFor: Record<DevLink["icon"], string> = {
+      github: "GitHub",
+      linkedin: "LinkedIn",
+      globe: "Portfolio",
+    }
+    const cleaned: DevLink[] = links
+      .filter((l) => typeof l.href === "string" && l.href.trim().length > 0)
+      .map((l) => ({ icon: l.icon, href: l.href.trim(), label: labelFor[l.icon] }))
+
+    state = { ...state, profile: { ...state.profile, links: cleaned } }
+    emit()
+
+    const me = getCachedAuthProfile()
+    if (me && me.role !== "enterprise") {
+      ;(async () => {
+        await supabase.from("student_links").delete().eq("student_id", me.id)
+        if (cleaned.length > 0) {
+          await supabase
+            .from("student_links")
+            .insert(cleaned.map((l) => ({ student_id: me.id, icon: l.icon, label: l.label, href: l.href })))
+        }
+      })().catch(() => {})
+    } else if (!me) {
+      persistProfile(state.profile)
+    }
+  } catch {
+    // ignore — fail silently to avoid breaking UI
+  }
+}
+
 // Editable identity fields (Settings page) — name/school/chapter/title.
 // No-op for demo/mock accounts; real accounts write straight to Supabase.
 export function updateDevIdentity(patch: { name?: string; school?: string; chapter?: string; title?: string }) {
