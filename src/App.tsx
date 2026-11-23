@@ -29,6 +29,8 @@ import {
   clearRealDevProfile,
 } from "./devProfile";
 
+import type { DevProject } from "./devProfile";
+
 import {
   useProjectStore,
   submitPhase,
@@ -2419,6 +2421,7 @@ function DeveloperProfile({
 
   const p = useDevProfile();
   const [editOpen, setEditOpen] = useState(false);
+  const [detailProject, setDetailProject] = useState<DevProject | null>(null);
 
   const verified = p.verificationStatus === "Verified";
 
@@ -3041,7 +3044,10 @@ function DeveloperProfile({
                   <td style={{ padding: "14px 24px" }}>
                     <a
                       href="#"
-                      onClick={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setDetailProject(proj);
+                      }}
                       style={{
                         color: "#2563EB",
 
@@ -3273,6 +3279,71 @@ function DeveloperProfile({
       >
         StartupMatch · Tagum City Developer Platform · © 2025
       </div>
+      {detailProject && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDetailProject(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            background: "rgba(0,0,0,0.48)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              width: "100%",
+              maxWidth: 480,
+              maxHeight: "80vh",
+              overflow: "auto",
+              boxShadow: "0px 8px 24px rgba(0,0,0,0.16)",
+              padding: 24,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{detailProject.name}</div>
+              <button
+                onClick={() => setDetailProject(null)}
+                aria-label="Close"
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18 }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ fontSize: 12.5, color: "#64748B", marginBottom: 16 }}>
+              {detailProject.client} · {detailProject.date}
+            </div>
+            <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Budget</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{detailProject.budget || "—"}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Status</div>
+                <DevStatusPill status={detailProject.status} />
+              </div>
+            </div>
+            {detailProject.summary && (
+              <p style={{ margin: "0 0 16px", fontSize: 13, color: "#334155", lineHeight: 1.6 }}>{detailProject.summary}</p>
+            )}
+            {detailProject.tech.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {detailProject.tech.map((t) => (
+                  <DevSkillTag key={t} label={t} muted />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7999,6 +8070,7 @@ function ProjectSpecForm({
   const bizName = authProfile?.business || "Apokon Hardware MSME";
 
   const [barangay, setBarangay] = useState("");
+  const [termsOpen, setTermsOpen] = useState(false);
 
   const [repName, setRepName] = useState(authProfile?.name || "Ernesto Dela Vega");
 
@@ -9781,6 +9853,10 @@ function ProjectSpecForm({
                           milestone delivery.{" "}
                           <a
                             href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setTermsOpen(true);
+                            }}
                             style={{ color: "#2563EB", fontWeight: 600 }}
                           >
                             Read full terms →
@@ -9967,6 +10043,34 @@ function ProjectSpecForm({
           </div>
         </div>
       </div>
+      {termsOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="specform-terms-title"
+          onClick={() => setTermsOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.48)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "80vh", overflow: "auto", boxShadow: "0px 8px 24px rgba(0,0,0,0.16)", padding: 24 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div id="specform-terms-title" style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>Milestone Verification & Dispute Resolution Terms</div>
+              <button onClick={() => setTermsOpen(false)} aria-label="Close" style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18 }}>×</button>
+            </div>
+            <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
+              <p><strong>Startup-Match Terms of Service</strong></p>
+              <p>By publishing a project requirement, you confirm this is a legitimate engagement request and agree to use the platform solely for legitimate project collaboration within the PSITS Tagum ecosystem.</p>
+              <p>Milestone escrow, verification vetting, and admin audit logs are provided as decision-support tools. The platform reserves the right to suspend unverified or disputed accounts pending PSITS Moderator review, and authorizes platform admins to mediate any disputes arising from milestone delivery.</p>
+              <p>For full terms contact your PSITS chapter administrator.</p>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <button onClick={() => setTermsOpen(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -13134,28 +13238,6 @@ function MilestoneTrackingPage({
                                 Platform admin Juanita Arceo has been notified.
                                 Expected resolution within 48 hours.
                               </span>
-                              <a
-                                href="#"
-                                style={{
-                                  fontSize: 12.5,
-
-                                  fontWeight: 700,
-
-                                  color: "#D97706",
-
-                                  textDecoration: "none",
-
-                                  whiteSpace: "nowrap",
-
-                                  display: "flex",
-
-                                  alignItems: "center",
-
-                                  gap: 4,
-                                }}
-                              >
-                                View Audit Log <IconExternal size={11} />
-                              </a>
                             </div>
                           </>
                         )}
@@ -14260,7 +14342,6 @@ function EnterpriseAnalyticsPage({
                 >
                   {profile.name}
                 </span>
-                <IconChevron size={12} />
               </div>
             )}
           </div>
@@ -15947,7 +16028,6 @@ export default function App() {
                     >
                       {profile.name}
                     </span>
-                    <IconChevron size={12} />
                   </div>
                 )}
                 {/* Logout — always accessible post-login */}
@@ -16247,7 +16327,6 @@ export default function App() {
                       >
                         {profile.name}
                       </span>
-                      <IconChevron size={12} />
                     </div>
                   )}
                   {/* Logout — always accessible post-login (best practice) */}
