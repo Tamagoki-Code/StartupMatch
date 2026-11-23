@@ -11889,6 +11889,29 @@ function MilestoneTrackingPage({
 }) {
   const [clientNav, setClientNav] = useState("overview");
 
+  // Off by default: a non-technical business owner doesn't need (or want)
+  // a raw GitHub repo link to judge whether work is done — the plain-
+  // language developer notes and live preview link already cover that.
+  // Remembered per-browser so they don't have to re-toggle every visit.
+  const [showDevDetails, setShowDevDetails] = useState(() => {
+    try {
+      return localStorage.getItem("startupmatch_show_dev_details") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleDevDetails = () => {
+    setShowDevDetails((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("startupmatch_show_dev_details", next ? "1" : "0");
+      } catch {
+        // ignore — best-effort persistence only
+      }
+      return next;
+    });
+  };
+
   const [disputeOpen, setDisputeOpen] = useState<number | null>(null);
 
   const [disputeNote, setDisputeNote] = useState("");
@@ -12500,6 +12523,40 @@ function MilestoneTrackingPage({
                   </span>
                 </div>
               </div>
+              <label
+                title="Shows the student's repository/codebase link. Off by default — you don't need it to tell whether work is done; the description and live preview link already cover that."
+                style={{
+                  display: "flex",
+
+                  alignItems: "center",
+
+                  gap: 8,
+
+                  padding: "6px 10px",
+
+                  borderRadius: 8,
+
+                  border: "1px solid #E2E8F0",
+
+                  background: "#fff",
+
+                  cursor: "pointer",
+
+                  userSelect: "none",
+
+                  flexShrink: 0,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={showDevDetails}
+                  onChange={toggleDevDetails}
+                  style={{ cursor: "pointer" }}
+                />
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#475569" }}>
+                  Show developer details
+                </span>
+              </label>
               {!isMobile && (
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
@@ -13061,96 +13118,98 @@ function MilestoneTrackingPage({
                         {/* Completed state */}
                         {isCompleted && (
                           <>
-                            <div
-                              style={{
-                                display: "flex",
+                            {showDevDetails && (
+                              <div
+                                style={{
+                                  display: "flex",
 
-                                gap: 10,
+                                  gap: 10,
 
-                                flexWrap: "wrap",
+                                  flexWrap: "wrap",
 
-                                alignItems: "flex-start",
-                              }}
-                            >
-                              <div style={{ flex: 1, minWidth: 200 }}>
-                                <div
-                                  style={{
-                                    fontSize: 11,
-
-                                    fontWeight: 700,
-
-                                    color: "#94A3B8",
-
-                                    textTransform: "uppercase",
-
-                                    letterSpacing: "0.06em",
-
-                                    marginBottom: 6,
-                                  }}
-                                >
-                                  Submitted Repository
-                                </div>
-                                <a
-                                  href={phase.repoLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{
-                                    display: "inline-flex",
-
-                                    alignItems: "center",
-
-                                    gap: 7,
-
-                                    padding: "8px 12px",
-
-                                    background: "#F8FAFC",
-
-                                    border: "1px solid #E2E8F0",
-
-                                    borderRadius: 8,
-
-                                    color: "#2563EB",
-
-                                    fontSize: 13,
-
-                                    fontWeight: 600,
-
-                                    textDecoration: "none",
-
-                                    maxWidth: "100%",
-
-                                    overflow: "hidden",
-
-                                    textOverflow: "ellipsis",
-
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  <IconGithub size={14} />
-                                  <span
+                                  alignItems: "flex-start",
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 200 }}>
+                                  <div
                                     style={{
+                                      fontSize: 11,
+
+                                      fontWeight: 700,
+
+                                      color: "#94A3B8",
+
+                                      textTransform: "uppercase",
+
+                                      letterSpacing: "0.06em",
+
+                                      marginBottom: 6,
+                                    }}
+                                  >
+                                    Submitted Repository
+                                  </div>
+                                  <a
+                                    href={phase.repoLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      display: "inline-flex",
+
+                                      alignItems: "center",
+
+                                      gap: 7,
+
+                                      padding: "8px 12px",
+
+                                      background: "#F8FAFC",
+
+                                      border: "1px solid #E2E8F0",
+
+                                      borderRadius: 8,
+
+                                      color: "#2563EB",
+
+                                      fontSize: 13,
+
+                                      fontWeight: 600,
+
+                                      textDecoration: "none",
+
+                                      maxWidth: "100%",
+
                                       overflow: "hidden",
 
                                       textOverflow: "ellipsis",
+
+                                      whiteSpace: "nowrap",
                                     }}
                                   >
-                                    {phase.repoLink.replace("https://", "")}
-                                  </span>
-                                  <IconExternal size={11} />
-                                </a>
-                                <div
-                                  style={{
-                                    fontSize: 11.5,
+                                    <IconGithub size={14} />
+                                    <span
+                                      style={{
+                                        overflow: "hidden",
 
-                                    color: "#94A3B8",
+                                        textOverflow: "ellipsis",
+                                      }}
+                                    >
+                                      {phase.repoLink.replace("https://", "")}
+                                    </span>
+                                    <IconExternal size={11} />
+                                  </a>
+                                  <div
+                                    style={{
+                                      fontSize: 11.5,
 
-                                    marginTop: 5,
-                                  }}
-                                >
-                                  Submitted {phase.submittedAt}
+                                      color: "#94A3B8",
+
+                                      marginTop: 5,
+                                    }}
+                                  >
+                                    Submitted {phase.submittedAt}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            )}
                             <div
                               style={{
                                 display: "flex",
@@ -13303,37 +13362,39 @@ function MilestoneTrackingPage({
                                     flexWrap: "wrap",
                                   }}
                                 >
-                                  <a
-                                    href={phase.repoLink}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{
-                                      display: "inline-flex",
+                                  {showDevDetails && (
+                                    <a
+                                      href={phase.repoLink}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{
+                                        display: "inline-flex",
 
-                                      alignItems: "center",
+                                        alignItems: "center",
 
-                                      gap: 6,
+                                        gap: 6,
 
-                                      padding: "7px 12px",
+                                        padding: "7px 12px",
 
-                                      background: "#fff",
+                                        background: "#fff",
 
-                                      border: "1px solid #E2E8F0",
+                                        border: "1px solid #E2E8F0",
 
-                                      borderRadius: 7,
+                                        borderRadius: 7,
 
-                                      color: "#334155",
+                                        color: "#334155",
 
-                                      fontSize: 12.5,
+                                        fontSize: 12.5,
 
-                                      fontWeight: 600,
+                                        fontWeight: 600,
 
-                                      textDecoration: "none",
-                                    }}
-                                  >
-                                    <IconGithub size={14} /> View Codebase{" "}
-                                    <IconExternal size={11} />
-                                  </a>
+                                        textDecoration: "none",
+                                      }}
+                                    >
+                                      <IconGithub size={14} /> View Codebase{" "}
+                                      <IconExternal size={11} />
+                                    </a>
+                                  )}
                                   {"prototypeLink" in phase &&
                                     phase.prototypeLink && (
                                       <a
