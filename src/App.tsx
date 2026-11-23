@@ -735,18 +735,6 @@ const adminNavItems = [
   { icon: IconSettings, label: "Settings", id: "settings" },
 ];
 
-// Ids that mean "jump to another top-level page" rather than "switch tab
-// within this page" — used wherever a role-specific sidebar (ClientSidebar)
-// appends admin's cross-page items to its own local tabs for an admin
-// viewing that page.
-const ADMIN_CROSS_PAGE_IDS: Record<string, true> = {
-  profile: true,
-  verification: true,
-  sprint: true,
-  analytics: true,
-  auditlogs: true,
-};
-
 // ─── Admin Sidebar ───────────────────────────────────────────────────────────
 
 function AdminSidebar({
@@ -10362,29 +10350,20 @@ function ClientSidebar({
   onNav,
 
   collapsed,
-
-  appRole,
 }: {
   active: string;
 
   onNav: (id: string) => void;
 
   collapsed: boolean;
-
-  appRole?: AppRole;
 }) {
   const client = useClientProfile();
   const project = useProjectStore();
-  const profile = useDevProfile();
   const hasRealContract = isUsingRealContract();
   const showActiveContract = !getCachedAuthProfile() || hasRealContract;
-  // Admin keeps every normal Milestone Tracking tab, plus the other pages
-  // it can reach (same ids as adminNavItems, routed cross-page by the caller
-  // via ADMIN_CROSS_PAGE_IDS) so it never needs the bottom page switcher.
-  const visibleItems =
-    appRole === "admin"
-      ? [...clientNavItems, ...adminNavItems.filter((i) => i.id in ADMIN_CROSS_PAGE_IDS)]
-      : clientNavItems;
+  // Admin never renders this sidebar (it gets AdminSidebar instead, same as
+  // every other page it can reach — see the page === "milestone" branch).
+  const visibleItems = clientNavItems;
 
   return (
     <aside
@@ -10476,7 +10455,7 @@ function ClientSidebar({
               StartupMatch
             </div>
             <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>
-              {appRole === "admin" ? "Regional Admin · Tagum" : "Enterprise Client Portal"}
+              Enterprise Client Portal
             </div>
           </div>
         )}
@@ -10625,14 +10604,14 @@ function ClientSidebar({
                 color: "#065F46",
               }}
             >
-              {appRole === "admin" ? profile.initials : client.initials}
+              {client.initials}
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
-                {appRole === "admin" ? profile.name : client.name}
+                {client.name}
               </div>
               <div style={{ fontSize: 11, color: "#64748B" }}>
-                {appRole === "admin" ? "Regional Administrator" : client.business}
+                {client.business}
               </div>
             </div>
           </div>
@@ -11809,23 +11788,30 @@ function MilestoneTrackingPage({
               : {}
           }
         >
-          <ClientSidebar
-            active={clientNav}
-            onNav={(id) => {
-              // Admin keeps the normal Milestone Tracking tabs (Overview,
-              // Project Contracts, etc.) plus the cross-page items appended
-              // below, routed through the shared admin handler.
-              if (appRole === "admin" && id in ADMIN_CROSS_PAGE_IDS) {
+          {appRole === "admin" ? (
+            // Same AdminSidebar as every other admin page — a different
+            // sidebar shape here (ClientSidebar's own tabs) read as the
+            // page switching out from under the admin on click.
+            <AdminSidebar
+              active="milestone"
+              onNav={(id) => {
                 onAdminNav?.(id);
-              } else {
-                setClientNav(id);
-              }
 
-              setSidebarOpen(false);
-            }}
-            collapsed={collapsed}
-            appRole={appRole}
-          />
+                setSidebarOpen(false);
+              }}
+              collapsed={collapsed}
+            />
+          ) : (
+            <ClientSidebar
+              active={clientNav}
+              onNav={(id) => {
+                setClientNav(id);
+
+                setSidebarOpen(false);
+              }}
+              collapsed={collapsed}
+            />
+          )}
         </div>
       )}
 
