@@ -77,7 +77,6 @@ export interface HybridMatchResult {
   structuredScore: number
   semanticScore: number
   tier: MatchTier
-  tierColor: "🟢" | "🟡" | "🔴"
   recommendation: string
   summary: string
   matchedCore: string[]
@@ -129,23 +128,19 @@ export async function computeHybridMatch(
   const finalScore = Math.round((structuredScore * 0.7 + finalSemanticScore * 0.3) * 10) / 10
 
   let tier: MatchTier
-  let tierColor: HybridMatchResult["tierColor"]
   let recommendation: string
   let summary: string
 
   if (finalScore >= 70) {
     tier = "Strong Match"
-    tierColor = "🟢"
     recommendation = "Interview Immediately"
     summary = `Highly compatible profile for '${customListingText || targetRole}'.`
   } else if (finalScore >= 45) {
     tier = "Medium Match"
-    tierColor = "🟡"
     recommendation = "Secondary Candidate"
     summary = "Solid foundational knowledge, with a few addressable skill gaps."
   } else {
     tier = "Weak Match"
-    tierColor = "🔴"
     recommendation = "Filter Out"
     summary = "Limited overlap with core requirements for this listing."
   }
@@ -156,7 +151,6 @@ export async function computeHybridMatch(
     structuredScore: Math.round(structuredScore * 10) / 10,
     semanticScore: Math.round(finalSemanticScore * 10) / 10,
     tier,
-    tierColor,
     recommendation,
     summary,
     matchedCore,

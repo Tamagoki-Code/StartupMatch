@@ -39,7 +39,8 @@ function TierBadge({ result }: { result: HybridMatchResult }) {
         fontWeight: 700,
       }}
     >
-      {result.tierColor} {result.tier}
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: colors.color }} />
+      {result.tier}
     </span>
   )
 }
@@ -235,7 +236,7 @@ export default function ResumeCheckPage() {
               fontFamily: "Inter, sans-serif",
             }}
           >
-            🌟 Auto-Match: Discover My Best Role
+            Auto-Match: Discover My Best Role
           </button>
           <button
             onClick={() => setMode("targeted")}
@@ -252,7 +253,7 @@ export default function ResumeCheckPage() {
               fontFamily: "Inter, sans-serif",
             }}
           >
-            🎯 Targeted Check: Test a Specific Role
+            Targeted Check: Test a Specific Role
           </button>
         </div>
 
@@ -303,7 +304,7 @@ export default function ResumeCheckPage() {
             fontFamily: "Inter, sans-serif",
           }}
         >
-          {busy ? "Analyzing…" : "📄 Upload your resume (PDF)"}
+          {busy ? "Analyzing…" : "Upload your resume (PDF)"}
         </button>
 
         {stage === "loading-model" && (
@@ -339,13 +340,13 @@ export default function ResumeCheckPage() {
             <p style={{ margin: "10px 0 0", fontSize: 13, color: "#475569" }}>{allResults[0].summary}</p>
             {allResults[0].missingCore.length > 0 ? (
               <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "#D97706" }}>
-                💡 Next skill to learn: build a mini-project featuring{" "}
+                Next skill to learn: build a mini-project featuring{" "}
                 <strong>{allResults[0].missingCore.slice(0, 2).join(", ")}</strong> to reach maximum match
                 strength.
               </p>
             ) : (
               <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "#16A34A" }}>
-                🎉 Ready to bid! You have full core skill coverage for this role.
+                Ready to bid! You have full core skill coverage for this role.
               </p>
             )}
           </div>
@@ -394,7 +395,7 @@ export default function ResumeCheckPage() {
           <p style={{ margin: 0, fontSize: 13, color: "#475569" }}>{singleResult.summary}</p>
           {singleResult.missingCore.length > 0 && (
             <p style={{ margin: 0, fontSize: 12.5, color: "#D97706" }}>
-              💡 Follow a tutorial and build a GitHub project demonstrating{" "}
+              Follow a tutorial and build a GitHub project demonstrating{" "}
               <strong>{singleResult.missingCore.slice(0, 2).join(", ")}</strong>.
             </p>
           )}

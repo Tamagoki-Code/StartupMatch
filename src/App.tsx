@@ -393,21 +393,13 @@ function IconBids({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
       <path
-        d="M3 14l4-4 3 3 4-5 3 3"
+        d="M3 3h5l9 9-6 6-9-9V3z"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <rect
-        x="2"
-        y="2"
-        width="16"
-        height="16"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
+      <circle cx="6.5" cy="6.5" r="1.2" fill="currentColor" />
     </svg>
   );
 }

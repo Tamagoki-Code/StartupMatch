@@ -46,7 +46,8 @@ function TierBadge({ result }: { result: HybridMatchResult }) {
         fontWeight: 700,
       }}
     >
-      {result.tierColor} {result.tier}
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: colors.color }} />
+      {result.tier}
     </span>
   )
 }
@@ -219,7 +220,7 @@ export default function ApplicantRankingPanel({
                 fontFamily: "Inter, sans-serif",
               }}
             >
-              🏆 Rank Applicants
+              Rank Applicants
             </button>
           </div>
         )}
@@ -237,7 +238,7 @@ export default function ApplicantRankingPanel({
         {stage === "done" && results && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
-              🏆 Candidate Ranking ({results.length} applicant{results.length === 1 ? "" : "s"})
+              Candidate Ranking ({results.length} applicant{results.length === 1 ? "" : "s"})
             </div>
             {results.map((row, i) => (
               <div
