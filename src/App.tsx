@@ -10525,7 +10525,7 @@ function BidsReceivedPanel() {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  🏆 Rank Applicants
+                  Rank Applicants
                 </button>
               )}
             </div>
