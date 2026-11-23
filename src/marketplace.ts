@@ -112,6 +112,7 @@ export interface CreateProjectInput {
   phases: number
   barangay: string
   milestones: ProjectMilestoneInput[]
+  status?: "Draft" | "Open" // defaults to "Open" — pass "Draft" for Save as Draft
 }
 
 export async function createMarketplaceProject(input: CreateProjectInput): Promise<void> {
@@ -130,11 +131,90 @@ export async function createMarketplaceProject(input: CreateProjectInput): Promi
     deadline: input.deadline || null,
     phases: input.phases,
     barangay: input.barangay || null,
-    status: "Open",
+    status: input.status ?? "Open",
     milestones: input.milestones,
   })
 
   if (error) throw error
+}
+
+// ─── Draft projects ("Save as Draft") ───────────────────────────────────────
+
+export interface DraftProject {
+  id: string
+  title: string
+  budget: string
+  savedAt: string
+}
+
+export async function fetchMyDraftProjects(): Promise<DraftProject[]> {
+  const me = getCachedAuthProfile()
+  if (!me || me.role !== "enterprise") return []
+
+  const { data, error } = await supabase
+    .from("marketplace_projects")
+    .select("id, title, budget_min, budget_max, posted_at")
+    .eq("enterprise_id", me.id)
+    .eq("status", "Draft")
+    .order("posted_at", { ascending: false })
+
+  if (error) throw error
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    title: (row.title as string) || "Untitled draft",
+    budget: formatBudgetRange(row.budget_min as number | null, row.budget_max as number | null),
+    savedAt: formatDate(row.posted_at as string | null),
+  }))
+}
+
+export async function publishDraftProject(id: string): Promise<void> {
+  const { error } = await supabase.from("marketplace_projects").update({ status: "Open" }).eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteDraftProject(id: string): Promise<void> {
+  const { error } = await supabase.from("marketplace_projects").delete().eq("id", id).eq("status", "Draft")
+  if (error) throw error
+}
+
+// ─── Posted projects (Project Contracts view) ───────────────────────────────
+// The "Project Contracts" table previously showed only awarded contracts
+// (one per project, only once a bid is awarded), so a freshly published
+// project with no bids yet never appeared there. This lists every project
+// the enterprise has posted — Open, Awarded or Closed — regardless of
+// whether it has a contract yet.
+
+export interface PostedProject {
+  id: string
+  title: string
+  status: "Open" | "Awarded" | "Closed"
+  budget: string
+  postedAt: string
+  bidCount: number
+}
+
+export async function fetchMyPostedProjects(): Promise<PostedProject[]> {
+  const me = getCachedAuthProfile()
+  if (!me || me.role !== "enterprise") return []
+
+  const { data, error } = await supabase
+    .from("marketplace_projects")
+    .select("id, title, status, budget_min, budget_max, posted_at, bids(count)")
+    .eq("enterprise_id", me.id)
+    .neq("status", "Draft")
+    .order("posted_at", { ascending: false })
+
+  if (error) throw error
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    title: row.title as string,
+    status: row.status as PostedProject["status"],
+    budget: formatBudgetRange(row.budget_min as number | null, row.budget_max as number | null),
+    postedAt: formatDate(row.posted_at as string | null),
+    bidCount: Array.isArray(row.bids) ? ((row.bids[0] as { count: number } | undefined)?.count ?? 0) : 0,
+  }))
 }
 
 // ─── Bids (read: bidder; write: bidding student) ───────────────────────────

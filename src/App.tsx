@@ -42,6 +42,7 @@ import {
   addTask,
   completeTask,
   addComment,
+  deleteComment,
   approvePhase,
   disputePhase,
   markNotificationRead,
@@ -87,7 +88,12 @@ import {
   useMyBids,
   placeBidOnProject,
   createMarketplaceProject,
+  fetchMyDraftProjects,
+  publishDraftProject,
+  deleteDraftProject,
+  fetchMyPostedProjects,
 } from "./marketplace";
+import type { DraftProject, PostedProject } from "./marketplace";
 
 import { useAllProfiles, setVerificationStatus, promoteToAdmin } from "./admin";
 import type { AdminProfileRow } from "./admin";
@@ -610,6 +616,26 @@ function StatusPill({ status }: { status: string }) {
       border: "#FECACA",
 
       dot: "#DC2626",
+    },
+
+    Open: {
+      bg: "#EFF6FF",
+
+      color: "#2563EB",
+
+      border: "#BFDBFE",
+
+      dot: "#2563EB",
+    },
+
+    Closed: {
+      bg: "#F1F5F9",
+
+      color: "#64748B",
+
+      border: "#E2E8F0",
+
+      dot: "#94A3B8",
     },
   };
 
@@ -5893,6 +5919,25 @@ function SprintDashboard({
                                       >
                                         {c.role} · {c.time}
                                       </span>
+                                      {(getCachedAuthProfile()
+                                        ? c.authorId === getCachedAuthProfile()?.id
+                                        : c.role === "developer") && (
+                                        <button
+                                          onClick={() => deleteComment(phase.number, c.id)}
+                                          title="Delete comment"
+                                          style={{
+                                            marginLeft: "auto",
+                                            background: "none",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            color: "#94A3B8",
+                                            padding: 2,
+                                            lineHeight: 0,
+                                          }}
+                                        >
+                                          <IconX size={10} />
+                                        </button>
+                                      )}
                                     </div>
                                     <div
                                       style={{
@@ -8101,6 +8146,16 @@ function ProjectSpecForm({
 
   const [published, setPublished] = useState(false);
 
+  const [drafts, setDrafts] = useState<DraftProject[]>([]);
+
+  const refreshDrafts = () => {
+    fetchMyDraftProjects()
+      .then(setDrafts)
+      .catch(() => {});
+  };
+
+  useEffect(refreshDrafts, []);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [scopeFocused, setScopeFocused] = useState(false);
@@ -8219,6 +8274,55 @@ function ProjectSpecForm({
     }
 
     setPublished(true);
+  }
+
+  async function handleSaveDraft() {
+    if (!projTitle.trim()) {
+      setErrors((e) => ({ ...e, projTitle: "Add a project title before saving a draft." }));
+      return;
+    }
+
+    const authProfile = getCachedAuthProfile();
+    if (authProfile && authProfile.role === "enterprise") {
+      try {
+        const numericBudget = Number(budget.replace(/[^0-9.]/g, "")) || null;
+        await createMarketplaceProject({
+          title: projTitle,
+          description: scope,
+          tags: selectedTags,
+          budget: numericBudget,
+          deadline,
+          phases: Math.max(1, Math.min(8, parseInt(numPhases) || 1)),
+          barangay,
+          milestones: milestones.map((m) => ({ title: m.title, dueDate: m.dueDate })),
+          status: "Draft",
+        });
+        refreshDrafts();
+      } catch (err) {
+        window.alert(err instanceof Error ? err.message : "Failed to save draft");
+        return;
+      }
+    }
+
+    setSaved(true);
+  }
+
+  async function handlePublishDraft(id: string) {
+    try {
+      await publishDraftProject(id);
+      refreshDrafts();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to publish draft");
+    }
+  }
+
+  async function handleDeleteDraft(id: string) {
+    try {
+      await deleteDraftProject(id);
+      refreshDrafts();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to delete draft");
+    }
   }
 
   const filteredTags = TECH_TAGS.filter(
@@ -8690,6 +8794,91 @@ function ProjectSpecForm({
                 structured project bids from local PSITS student developers.
               </p>
             </div>
+
+            {drafts.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 28,
+                  padding: 16,
+                  borderRadius: 10,
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#64748B",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    marginBottom: 10,
+                  }}
+                >
+                  Saved Drafts ({drafts.length})
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {drafts.map((d) => (
+                    <div
+                      key={d.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        padding: "8px 12px",
+                        background: "#fff",
+                        border: "1px solid #E2E8F0",
+                        borderRadius: 8,
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
+                          {d.title}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "#94A3B8" }}>
+                          {d.budget} · Saved {d.savedAt}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button
+                          onClick={() => handlePublishDraft(d.id)}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 6,
+                            border: "1px solid #BFDBFE",
+                            background: "#EFF6FF",
+                            color: "#2563EB",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: "Inter, sans-serif",
+                          }}
+                        >
+                          Publish
+                        </button>
+                        <button
+                          onClick={() => handleDeleteDraft(d.id)}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 6,
+                            border: "1px solid #E2E8F0",
+                            background: "#fff",
+                            color: "#DC2626",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: "Inter, sans-serif",
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ── Group 1: Corporate & Demographic Info ───────────────── */}
             <div style={{ marginBottom: 36 }}>
@@ -9926,7 +10115,7 @@ function ProjectSpecForm({
               }}
             >
               <button
-                onClick={() => setSaved(true)}
+                onClick={handleSaveDraft}
                 style={{
                   flex: isMobile ? 1 : "unset",
 
@@ -10179,6 +10368,7 @@ function ClientSidebar({
 }) {
   const client = useClientProfile();
   const project = useProjectStore();
+  const profile = useDevProfile();
   const hasRealContract = isUsingRealContract();
   const showActiveContract = !getCachedAuthProfile() || hasRealContract;
   // Admin keeps every normal Milestone Tracking tab, plus the other pages
@@ -10428,14 +10618,14 @@ function ClientSidebar({
                 color: "#065F46",
               }}
             >
-              {client.initials}
+              {appRole === "admin" ? profile.initials : client.initials}
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
-                {client.name}
+                {appRole === "admin" ? profile.name : client.name}
               </div>
               <div style={{ fontSize: 11, color: "#64748B" }}>
-                {client.business}
+                {appRole === "admin" ? "Regional Administrator" : client.business}
               </div>
             </div>
           </div>
@@ -10606,7 +10796,9 @@ function ClientOverview({ isMobile, onNavigate }: { isMobile: boolean; onNavigat
       <div>
         <h1 style={{ margin: "0 0 6px", fontSize: isMobile ? 22 : 26, fontWeight: 700, color: "#0F172A", letterSpacing: "-0.03em" }}>Client Dashboard</h1>
         <p style={{ margin: 0, fontSize: 13.5, color: "#64748B" }}>
-          {[client.business, client.barangay, client.permit].filter(Boolean).join(" · ")}
+          {getCachedAuthProfile()?.role === "admin"
+            ? "Reviewing enterprise activity as Regional Administrator"
+            : [client.business, client.barangay, client.permit].filter(Boolean).join(" · ")}
         </p>
       </div>
       <BidsReceivedPanel />
@@ -10668,14 +10860,30 @@ function ProjectContractsView({ onPostProject, isMobile }: { onPostProject: () =
   // never the fabricated demo history below, which previously showed for
   // every real account regardless of whether it had any contract at all).
   const isReal = !!getCachedAuthProfile();
+
+  // Every project the enterprise has posted — not just ones that already
+  // have an awarded contract, which previously made a freshly published
+  // project (with no bids yet) invisible here.
+  const [posted, setPosted] = useState<PostedProject[]>([]);
+  useEffect(() => {
+    if (!isReal) return;
+    fetchMyPostedProjects().then(setPosted).catch(() => {});
+  }, [isReal]);
+
   const contracts = isReal
-    ? isUsingRealContract()
-      ? [{ id: "c1", title: safeProject.project, client: safeProject.client, status: "Active", budget: formatPeso(safeProject.totalBudget), date: safeProject.started }]
-      : []
+    ? posted.map((p) => ({
+        id: p.id,
+        title: p.title,
+        client: safeProject.client,
+        status: p.status === "Open" ? "Open" : p.status === "Awarded" ? "Active" : "Closed",
+        budget: p.budget,
+        date: p.postedAt,
+        bidCount: p.bidCount,
+      }))
     : [
-        { id: "c1", title: safeProject.project, client: safeProject.client, status: "Active", budget: formatPeso(safeProject.totalBudget), date: safeProject.started },
-        { id: "c2", title: "Retail POS & Inventory System", client: "CityMall Tagum", status: "Completed", budget: "₱32,000", date: "Jul 2025" },
-        { id: "c3", title: "Harvest Yield Analytics", client: "Mindanao Agri Holdings", status: "Pending Review", budget: "₱18,000", date: "Aug 2025" },
+        { id: "c1", title: safeProject.project, client: safeProject.client, status: "Active", budget: formatPeso(safeProject.totalBudget), date: safeProject.started, bidCount: 0 },
+        { id: "c2", title: "Retail POS & Inventory System", client: "CityMall Tagum", status: "Completed", budget: "₱32,000", date: "Jul 2025", bidCount: 0 },
+        { id: "c3", title: "Harvest Yield Analytics", client: "Mindanao Agri Holdings", status: "Pending Review", budget: "₱18,000", date: "Aug 2025", bidCount: 0 },
       ];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -10686,13 +10894,14 @@ function ProjectContractsView({ onPostProject, isMobile }: { onPostProject: () =
         </div>
         <button onClick={onPostProject} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Inter, sans-serif", display: "inline-flex", alignItems: "center", gap: 7 }}><IconMarket size={16}/> Post a Project</button>
       </div>
+      {isReal && <BidsReceivedPanel />}
       <Card style={{ overflow: "hidden" }}>
         {contracts.length === 0 ? (
-          <EmptyState message="No contracts yet. Post a project and award a bid to start one." />
+          <EmptyState message="No projects yet. Post a project to see it here." />
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead><tr style={{ background: "#F8FAFC" }}>{["Contract", "Client", "Date", "Status", "Budget"].map((h) => (<th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E2E8F0", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
+              <thead><tr style={{ background: "#F8FAFC" }}>{["Project", "Client", "Date", "Status", "Budget", "Bids"].map((h) => (<th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E2E8F0", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
               <tbody>
                 {contracts.map((c) => (
                   <tr key={c.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
@@ -10701,6 +10910,7 @@ function ProjectContractsView({ onPostProject, isMobile }: { onPostProject: () =
                     <td style={{ padding: "14px 16px", color: "#64748B" }}>{c.date}</td>
                     <td style={{ padding: "14px 16px" }}><StatusPill status={c.status} /></td>
                     <td style={{ padding: "14px 16px", color: "#0F172A", fontWeight: 600 }}>{c.budget}</td>
+                    <td style={{ padding: "14px 16px", color: "#475569" }}>{c.bidCount}</td>
                   </tr>
                 ))}
               </tbody>
@@ -11270,10 +11480,11 @@ function SettingsView() {
               </div>
               <div>
                 <label style={labelStyle}>Barangay</label>
-                <input
-                  style={inputStyle}
+                <SelectInput
                   value={barangayInput}
-                  onChange={(e) => setBarangayInput(e.target.value)}
+                  onChange={setBarangayInput}
+                  options={BARANGAYS}
+                  placeholder="Select your barangay / zone…"
                 />
               </div>
             </>
@@ -13461,6 +13672,24 @@ function MilestoneTrackingPage({
                           <span style={{ fontSize: 10.5, color: "#94A3B8" }}>
                             {msg.time}
                           </span>
+                          {(getCachedAuthProfile()
+                            ? msg.authorId === getCachedAuthProfile()?.id
+                            : msg.role === "client") && (
+                            <button
+                              onClick={() => deleteComment(discussionPhaseNumber, msg.id)}
+                              title="Delete comment"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                color: "#94A3B8",
+                                padding: 2,
+                                lineHeight: 0,
+                              }}
+                            >
+                              <IconX size={10} />
+                            </button>
+                          )}
                         </div>
                         <div
                           style={{

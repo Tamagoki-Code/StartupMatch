@@ -21,6 +21,8 @@ export interface PhaseComment {
 
   author: string
 
+  authorId?: string
+
   role: CommentRole
 
   avatar: string

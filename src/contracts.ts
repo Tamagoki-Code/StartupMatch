@@ -233,6 +233,7 @@ export async function fetchActiveContract(): Promise<SprintProject | null> {
       .map((c) => ({
         id: c.id,
         author: c.author_name,
+        authorId: c.author_id ?? undefined,
         role: c.role,
         avatar: initialsFrom(c.author_name),
         avatarBg: ROLE_AVATAR_BG[c.role],
@@ -443,6 +444,13 @@ export async function addComment(number: number, text: string, role: CommentRole
   } else {
     await notify(m.enterpriseId, "info", `Message from ${me.name}: "${trimmed}"`)
   }
+}
+
+// RLS (phase_comments delete policy) restricts this to the comment's own
+// author or an admin — the server is the real guard, not this client check.
+export async function deleteComment(commentId: string) {
+  const { error } = await supabase.from("phase_comments").delete().eq("id", commentId)
+  if (error) throw error
 }
 
 // ─── Actions (enterprise / "client" side) ───────────────────────────────────

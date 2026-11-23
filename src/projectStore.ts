@@ -503,6 +503,30 @@ function patchPhase(
   }
 }
 
+// Optimistic counterpart to patchPhase for a real (Supabase-backed) contract:
+// applies the same shape of local patch immediately so the UI responds on
+// the keystroke/click instead of waiting on a network round trip, while the
+// real write happens in the background. Unlike patchPhase, this is the only
+// mutator allowed to touch `project` while realActive — callers still fire
+// the real write themselves and should resync (refreshRealProject) on error.
+function patchRealPhase(
+  number: number,
+  updater: (phase: ProjectPhase) => ProjectPhase,
+) {
+  try {
+    if (!realActive) return
+    if (!Array.isArray(project?.phases)) return
+    if (typeof number !== "number" || !Number.isFinite(number)) return
+    project = {
+      ...project,
+      phases: project.phases.map((p) => (p.number === number ? updater(p) : p)),
+    }
+    emit()
+  } catch {
+    // ignore
+  }
+}
+
 function pushNotification(type: SprintNotifType, text: string) {
   // Error handling: guard against empty text or corrupted project
   try {
@@ -638,9 +662,37 @@ export function reviseSubmission(number: number) {
   }))
 }
 
+// Debounced background writer for the three dev-side text fields below: an
+// un-debounced write-per-keystroke was hitting Supabase on every character,
+// and the eventual refreshRealProject() replaying over local state while the
+// user kept typing is what made characters appear dropped/reordered. Each
+// field gets its own timer (keyed by phase+field) so edits to different
+// fields/phases don't cancel each other.
+const pendingFieldWrites = new Map<string, ReturnType<typeof setTimeout>>()
+const FIELD_WRITE_DEBOUNCE_MS = 700
+
+function writeFieldDebounced(key: string, write: () => Promise<unknown>) {
+  const existing = pendingFieldWrites.get(key)
+  if (existing) clearTimeout(existing)
+  pendingFieldWrites.set(
+    key,
+    setTimeout(() => {
+      pendingFieldWrites.delete(key)
+      // Best-effort: on failure we don't refetch, since that would overwrite
+      // whatever the user has typed since — the next edit's debounced write
+      // will retry with the latest value anyway.
+      write().catch(() => {})
+    }, FIELD_WRITE_DEBOUNCE_MS),
+  )
+}
+
 export function updateRepoLink(number: number, url: string) {
   if (realActive) {
-    realContracts.updateRepoLink(number, url).then(refreshRealProject).catch(() => {})
+    patchRealPhase(number, (phase) => ({
+      ...phase,
+      dev: { ...phase.dev, repoLink: url },
+    }))
+    writeFieldDebounced(`repoLink:${number}`, () => realContracts.updateRepoLink(number, url))
     return
   }
 
@@ -652,7 +704,11 @@ export function updateRepoLink(number: number, url: string) {
 
 export function updatePrototypeLink(number: number, url: string) {
   if (realActive) {
-    realContracts.updatePrototypeLink(number, url).then(refreshRealProject).catch(() => {})
+    patchRealPhase(number, (phase) => ({
+      ...phase,
+      dev: { ...phase.dev, prototypeLink: url },
+    }))
+    writeFieldDebounced(`prototypeLink:${number}`, () => realContracts.updatePrototypeLink(number, url))
     return
   }
 
@@ -664,7 +720,11 @@ export function updatePrototypeLink(number: number, url: string) {
 
 export function updateNotes(number: number, text: string) {
   if (realActive) {
-    realContracts.updateNotes(number, text).then(refreshRealProject).catch(() => {})
+    patchRealPhase(number, (phase) => ({
+      ...phase,
+      dev: { ...phase.dev, updates: text },
+    }))
+    writeFieldDebounced(`notes:${number}`, () => realContracts.updateNotes(number, text))
     return
   }
 
@@ -676,7 +736,14 @@ export function updateNotes(number: number, text: string) {
 
 export function addTask(number: number, label: string) {
   if (realActive) {
-    realContracts.addTask(number, label).then(refreshRealProject).catch(() => {})
+    const tempId = `t${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    patchRealPhase(number, (phase) => ({
+      ...phase,
+      tasks: [...phase.tasks, { id: tempId, label, done: false }],
+    }))
+    // Reconciles the temp id with the real one once the write lands — UI
+    // already reflects the add, so this refresh is invisible either way.
+    realContracts.addTask(number, label).then(refreshRealProject).catch(() => void refreshRealProject())
     return
   }
 
@@ -696,7 +763,13 @@ export function addTask(number: number, label: string) {
 
 export function completeTask(number: number, taskId: string) {
   if (realActive) {
-    realContracts.completeTask(taskId).then(refreshRealProject).catch(() => {})
+    patchRealPhase(number, (phase) => ({
+      ...phase,
+      tasks: phase.tasks.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t)),
+    }))
+    // Only resync on failure (rollback) — on success the optimistic state
+    // above already matches the server, so no refetch is needed.
+    realContracts.completeTask(taskId).catch(() => void refreshRealProject())
     return
   }
 
@@ -754,6 +827,24 @@ export function addComment(number: number, text: string, role: CommentRole) {
       `Message from ${identity.author}: "${text.trim()}"`,
     )
   }
+}
+
+export function deleteComment(number: number, commentId: string) {
+  if (realActive) {
+    patchRealPhase(number, (phase) => ({
+      ...phase,
+      comments: phase.comments.filter((c) => c.id !== commentId),
+    }))
+    // Rollback via resync if the server refuses the delete (e.g. not the
+    // author) — RLS is the real guard, the UI just reflects the outcome.
+    realContracts.deleteComment(commentId).catch(() => void refreshRealProject())
+    return
+  }
+
+  patchPhase(number, (phase) => ({
+    ...phase,
+    comments: phase.comments.filter((c) => c.id !== commentId),
+  }))
 }
 
 export function approvePhase(number: number, score = 5) {
