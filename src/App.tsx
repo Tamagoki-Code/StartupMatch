@@ -3968,8 +3968,9 @@ function SprintSidebar({
         )}
       </div>
 
-      {/* Active project chip */}
-      {!collapsed && (
+      {/* Active project chip — hidden for a real signed-in user with no
+          real contract loaded, instead of showing the demo seed project. */}
+      {!collapsed && (!getCachedAuthProfile() || isUsingRealContract()) && (
         <div
           style={{
             margin: "12px 16px 4px",
@@ -10465,41 +10466,52 @@ function ClientOverview({ isMobile, onNavigate }: { isMobile: boolean; onNavigat
         <p style={{ margin: 0, fontSize: 13.5, color: "#64748B" }}>{client.business} · {client.barangay} · {client.permit}</p>
       </div>
       <BidsReceivedPanel />
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16 }}>
-        <Card style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Active Contract</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{project.project}</div>
-          <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{project.client} · Due {project.deadline} ({project.daysLeft}d left)</div>
-          <span style={{ display: "inline-flex", marginTop: 10, padding: "3px 10px", borderRadius: 99, background: "#EFF6FF", border: "1px solid #BFDBFE", color: "#2563EB", fontSize: 11, fontWeight: 700 }}>{project.contractType}</span>
-        </Card>
-        <Card style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Budget</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#0F172A" }}>{formatPeso(project.totalBudget)}</div>
-          <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>Paid {formatPeso(project.paidToDate)} · Remaining {formatPeso(remaining)}</div>
-          <div style={{ marginTop: 12, height: 6, background: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}><div style={{ width: `${Math.round((project.paidToDate / project.totalBudget) * 100)}%`, height: "100%", background: "#2563EB", borderRadius: 3 }} /></div>
-        </Card>
-        <Card style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Milestone Progress</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#0F172A" }}>{verified}/{total} · {pct}%</div>
-          <div style={{ marginTop: 12, height: 6, background: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: "#16A34A", borderRadius: 3 }} /></div>
-          <div style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>Started {project.started} · {project.platform}</div>
-        </Card>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
-        <Card style={{ padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 12 }}>Recent Activity</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {project.notifications.slice(0, 3).map((n) => (
-              <div key={n.id} style={{ padding: "8px 10px", background: n.type === "success" ? "#F0FDF4" : n.type === "warning" ? "#FFFBEB" : "#EFF6FF", border: `1px solid ${n.type === "success" ? "#BBF7D0" : n.type === "warning" ? "#FDE68A" : "#BFDBFE"}`, borderRadius: 8, fontSize: 12, color: "#334155" }}>{n.text}</div>
-            ))}
+      {/* Contract/budget/activity cards show real data only — hidden for a
+          real enterprise user with no real contract, instead of the demo
+          seed project (same class of bug as the sidebar/header chips). */}
+      {!getCachedAuthProfile() || isUsingRealContract() ? (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16 }}>
+            <Card style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Active Contract</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{project.project}</div>
+              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{project.client} · Due {project.deadline} ({project.daysLeft}d left)</div>
+              <span style={{ display: "inline-flex", marginTop: 10, padding: "3px 10px", borderRadius: 99, background: "#EFF6FF", border: "1px solid #BFDBFE", color: "#2563EB", fontSize: 11, fontWeight: 700 }}>{project.contractType}</span>
+            </Card>
+            <Card style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Budget</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#0F172A" }}>{formatPeso(project.totalBudget)}</div>
+              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>Paid {formatPeso(project.paidToDate)} · Remaining {formatPeso(remaining)}</div>
+              <div style={{ marginTop: 12, height: 6, background: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}><div style={{ width: `${Math.round((project.paidToDate / project.totalBudget) * 100)}%`, height: "100%", background: "#2563EB", borderRadius: 3 }} /></div>
+            </Card>
+            <Card style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Milestone Progress</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#0F172A" }}>{verified}/{total} · {pct}%</div>
+              <div style={{ marginTop: 12, height: 6, background: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: "#16A34A", borderRadius: 3 }} /></div>
+              <div style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>Started {project.started} · {project.platform}</div>
+            </Card>
           </div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
+            <Card style={{ padding: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 12 }}>Recent Activity</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {project.notifications.slice(0, 3).map((n) => (
+                  <div key={n.id} style={{ padding: "8px 10px", background: n.type === "success" ? "#F0FDF4" : n.type === "warning" ? "#FFFBEB" : "#EFF6FF", border: `1px solid ${n.type === "success" ? "#BBF7D0" : n.type === "warning" ? "#FDE68A" : "#BFDBFE"}`, borderRadius: 8, fontSize: 12, color: "#334155" }}>{n.text}</div>
+                ))}
+              </div>
+            </Card>
+            <Card style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Quick Actions</div>
+              <button onClick={() => onNavigate("specform")} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Inter, sans-serif", display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center" }}><IconMarket size={16}/> Post a Project</button>
+              <button onClick={() => onNavigate("contracts")} style={{ padding: "10px 16px", borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>View Contract</button>
+            </Card>
+          </div>
+        </>
+      ) : (
+        <Card style={{ padding: 0 }}>
+          <EmptyState message="No active contract yet. Award a bid on one of your postings to start tracking it here." />
         </Card>
-        <Card style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Quick Actions</div>
-          <button onClick={() => onNavigate("specform")} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Inter, sans-serif", display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center" }}><IconMarket size={16}/> Post a Project</button>
-          <button onClick={() => onNavigate("contracts")} style={{ padding: "10px 16px", borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}>View Contract</button>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }
@@ -10508,11 +10520,19 @@ function ProjectContractsView({ onPostProject, isMobile }: { onPostProject: () =
   // Error handling: guard against empty project during reset
   const project = useProjectStore();
   const safeProject = project ?? { project: "—", client: "—", totalBudget: 0, started: "—" } as unknown as typeof project;
-  const contracts = [
-    { id: "c1", title: safeProject.project, client: safeProject.client, status: "Active", budget: formatPeso(safeProject.totalBudget), date: safeProject.started },
-    { id: "c2", title: "Retail POS & Inventory System", client: "CityMall Tagum", status: "Completed", budget: "₱32,000", date: "Jul 2025" },
-    { id: "c3", title: "Harvest Yield Analytics", client: "Mindanao Agri Holdings", status: "Pending Review", budget: "₱18,000", date: "Aug 2025" },
-  ];
+  // A real signed-in user only ever sees their own real contract (or none —
+  // never the fabricated demo history below, which previously showed for
+  // every real account regardless of whether it had any contract at all).
+  const isReal = !!getCachedAuthProfile();
+  const contracts = isReal
+    ? isUsingRealContract()
+      ? [{ id: "c1", title: safeProject.project, client: safeProject.client, status: "Active", budget: formatPeso(safeProject.totalBudget), date: safeProject.started }]
+      : []
+    : [
+        { id: "c1", title: safeProject.project, client: safeProject.client, status: "Active", budget: formatPeso(safeProject.totalBudget), date: safeProject.started },
+        { id: "c2", title: "Retail POS & Inventory System", client: "CityMall Tagum", status: "Completed", budget: "₱32,000", date: "Jul 2025" },
+        { id: "c3", title: "Harvest Yield Analytics", client: "Mindanao Agri Holdings", status: "Pending Review", budget: "₱18,000", date: "Aug 2025" },
+      ];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -10523,22 +10543,26 @@ function ProjectContractsView({ onPostProject, isMobile }: { onPostProject: () =
         <button onClick={onPostProject} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "Inter, sans-serif", display: "inline-flex", alignItems: "center", gap: 7 }}><IconMarket size={16}/> Post a Project</button>
       </div>
       <Card style={{ overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead><tr style={{ background: "#F8FAFC" }}>{["Contract", "Client", "Date", "Status", "Budget"].map((h) => (<th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E2E8F0", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
-            <tbody>
-              {contracts.map((c) => (
-                <tr key={c.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                  <td style={{ padding: "14px 16px", fontWeight: 600, color: "#0F172A" }}>{c.title}</td>
-                  <td style={{ padding: "14px 16px", color: "#475569" }}>{c.client}</td>
-                  <td style={{ padding: "14px 16px", color: "#64748B" }}>{c.date}</td>
-                  <td style={{ padding: "14px 16px" }}><StatusPill status={c.status} /></td>
-                  <td style={{ padding: "14px 16px", color: "#0F172A", fontWeight: 600 }}>{c.budget}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {contracts.length === 0 ? (
+          <EmptyState message="No contracts yet. Post a project and award a bid to start one." />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead><tr style={{ background: "#F8FAFC" }}>{["Contract", "Client", "Date", "Status", "Budget"].map((h) => (<th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #E2E8F0", whiteSpace: "nowrap" }}>{h}</th>))}</tr></thead>
+              <tbody>
+                {contracts.map((c) => (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                    <td style={{ padding: "14px 16px", fontWeight: 600, color: "#0F172A" }}>{c.title}</td>
+                    <td style={{ padding: "14px 16px", color: "#475569" }}>{c.client}</td>
+                    <td style={{ padding: "14px 16px", color: "#64748B" }}>{c.date}</td>
+                    <td style={{ padding: "14px 16px" }}><StatusPill status={c.status} /></td>
+                    <td style={{ padding: "14px 16px", color: "#0F172A", fontWeight: 600 }}>{c.budget}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -16071,8 +16095,10 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {/* Deadline chip */}
+                  {/* Deadline chip — hidden for a real user with no real
+                      contract loaded, instead of showing the demo deadline. */}
                   {!isMobile &&
+                    (!getCachedAuthProfile() || isUsingRealContract()) &&
                     (() => {
                       const due = project.phases.find(
                         (p) =>
