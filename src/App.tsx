@@ -688,10 +688,19 @@ function SkillTag({ label }: { label: string }) {
 }
 
 
+// Admin's single nav list, covering every page the role can reach (Option B
+// grants admin developer/admin/sprint/milestone/analytics — see
+// ROLE_PAGE_MAP). AdminSidebar renders this on every one of those pages, so
+// admin never needs the floating bottom page switcher the way student/
+// enterprise don't.
 const adminNavItems = [
-  { icon: IconDashboard, label: "Overview", id: "overview" },
+  { icon: IconDashboard, label: "Developer Profile", id: "profile" },
 
   { icon: IconShield, label: "Verification Queue", id: "verification" },
+
+  { icon: IconKanban, label: "Sprint Dashboard", id: "sprint" },
+
+  { icon: IconBids, label: "Milestone Tracking", id: "milestone" },
 
   { icon: IconChart, label: "Enterprise Analytics", id: "analytics" },
 
@@ -699,6 +708,18 @@ const adminNavItems = [
 
   { icon: IconSettings, label: "Settings", id: "settings" },
 ];
+
+// Ids that mean "jump to another top-level page" rather than "switch tab
+// within this page" — used wherever a role-specific sidebar (ClientSidebar)
+// appends admin's cross-page items to its own local tabs for an admin
+// viewing that page.
+const ADMIN_CROSS_PAGE_IDS: Record<string, true> = {
+  profile: true,
+  verification: true,
+  sprint: true,
+  analytics: true,
+  auditlogs: true,
+};
 
 // ─── Admin Sidebar ───────────────────────────────────────────────────────────
 
@@ -1794,35 +1815,18 @@ function DevSidebar({
   onNav,
 
   collapsed,
-
-  appRole,
 }: {
   active: string;
 
   onNav: (id: string) => void;
 
   collapsed: boolean;
-
-  appRole?: AppRole;
 }) {
   const profile = useDevProfile();
-  // Performance: memoize filtered nav to avoid new array per render — O(4) but per best practice
-  // Error handling: fail-closed — if appRole is corrupted/undefined, show full nav (least surprise)
-  const visibleDevNavItems = useMemo(() => {
-    try {
-      if (appRole === "admin") {
-        // Admin keeps using the page switcher to reach Sprint Dashboard (and
-        // doesn't market/bid/resume-check as a dev), so this list stays as
-        // narrow as it always was — only the student-facing sidebar grew.
-        return studentNavItems
-          .filter((i) => !["marketplace", "bids", "resumecheck", "sprintoverview", "sprint"].includes(i.id))
-          .map((i) => (i.id === "profile" ? { ...i, label: "Dashboard" } : i));
-      }
-      return studentNavItems;
-    } catch {
-      return studentNavItems;
-    }
-  }, [appRole]);
+  // Admin never renders this sidebar (it gets AdminSidebar instead, on every
+  // page it can reach — see the page === "developer" branch), so this is
+  // always the full student nav.
+  const visibleDevNavItems = studentNavItems;
 
   return (
     <aside
@@ -3939,30 +3943,17 @@ function SprintSidebar({
   onNav,
 
   collapsed,
-
-  appRole,
 }: {
   active: string;
 
   onNav: (id: string) => void;
 
   collapsed: boolean;
-
-  appRole?: AppRole;
 }) {
-  // Mirrors DevSidebar's admin filtering: admin reaches Developer
-  // Profile/Marketplace/Resume Check via the page switcher, not from here,
-  // so this stays the same 5 items admin always saw (just relabeled).
-  const visibleItems = useMemo(() => {
-    try {
-      if (appRole === "admin") {
-        return studentNavItems.filter((i) => !["profile", "marketplace", "resumecheck"].includes(i.id));
-      }
-      return studentNavItems;
-    } catch {
-      return studentNavItems;
-    }
-  }, [appRole]);
+  // Admin never renders this sidebar (it gets AdminSidebar instead, on every
+  // page it can reach — see the page === "sprint" branch), so this is
+  // always the full student nav.
+  const visibleItems = studentNavItems;
   const project = useProjectStore();
 
   const profile = useDevProfile();
@@ -10175,17 +10166,28 @@ function ClientSidebar({
   onNav,
 
   collapsed,
+
+  appRole,
 }: {
   active: string;
 
   onNav: (id: string) => void;
 
   collapsed: boolean;
+
+  appRole?: AppRole;
 }) {
   const client = useClientProfile();
   const project = useProjectStore();
   const hasRealContract = isUsingRealContract();
   const showActiveContract = !getCachedAuthProfile() || hasRealContract;
+  // Admin keeps every normal Milestone Tracking tab, plus the other pages
+  // it can reach (same ids as adminNavItems, routed cross-page by the caller
+  // via ADMIN_CROSS_PAGE_IDS) so it never needs the bottom page switcher.
+  const visibleItems =
+    appRole === "admin"
+      ? [...clientNavItems, ...adminNavItems.filter((i) => i.id in ADMIN_CROSS_PAGE_IDS)]
+      : clientNavItems;
 
   return (
     <aside
@@ -10334,7 +10336,7 @@ function ClientSidebar({
       )}
 
       <nav style={{ padding: "8px 0", flex: 1 }}>
-        {clientNavItems.map(({ icon: Icon, label, id }) => {
+        {visibleItems.map(({ icon: Icon, label, id }) => {
           const isActive = active === id;
 
           return (
@@ -11425,6 +11427,10 @@ function MilestoneTrackingPage({
   setSidebarOpen,
 
   onLogout,
+
+  appRole,
+
+  onAdminNav,
 }: {
   isMobile: boolean;
 
@@ -11437,6 +11443,10 @@ function MilestoneTrackingPage({
   setSidebarOpen: (v: boolean) => void;
 
   onLogout?: () => void;
+
+  appRole?: AppRole;
+
+  onAdminNav?: (id: string) => void;
 }) {
   const [clientNav, setClientNav] = useState("overview");
 
@@ -11584,11 +11594,19 @@ function MilestoneTrackingPage({
           <ClientSidebar
             active={clientNav}
             onNav={(id) => {
-              setClientNav(id);
+              // Admin keeps the normal Milestone Tracking tabs (Overview,
+              // Project Contracts, etc.) plus the cross-page items appended
+              // below, routed through the shared admin handler.
+              if (appRole === "admin" && id in ADMIN_CROSS_PAGE_IDS) {
+                onAdminNav?.(id);
+              } else {
+                setClientNav(id);
+              }
 
               setSidebarOpen(false);
             }}
             collapsed={collapsed}
+            appRole={appRole}
           />
         </div>
       )}
@@ -13813,250 +13831,9 @@ function ChartCard({
   );
 }
 
-function AnalyticsAdminSidebar({
-  active,
-
-  onNav,
-
-  collapsed,
-
-  onLogout,
-}: {
-  active: string;
-
-  onNav: (id: string) => void;
-
-  collapsed: boolean;
-
-  onLogout?: () => void;
-}) {
-  const profile = useDevProfile();
-
-  return (
-    <aside
-      style={{
-        width: collapsed ? 72 : 260,
-
-        minHeight: "100vh",
-
-        background: "#fff",
-
-        borderRight: "1px solid #E2E8F0",
-
-        display: "flex",
-
-        flexDirection: "column",
-
-        flexShrink: 0,
-
-        transition: "width 0.2s ease",
-
-        position: "sticky",
-
-        top: 0,
-
-        height: "100vh",
-      }}
-    >
-      <div
-        style={{
-          padding: collapsed ? "20px 0" : "20px 22px",
-
-          display: "flex",
-
-          alignItems: "center",
-
-          gap: 10,
-
-          borderBottom: "1px solid #F1F5F9",
-        }}
-      >
-        <div
-          style={{
-            width: 36,
-
-            height: 36,
-
-            borderRadius: 8,
-
-            flexShrink: 0,
-
-            background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
-
-            display: "flex",
-
-            alignItems: "center",
-
-            justifyContent: "center",
-
-            marginLeft: collapsed ? "auto" : 0,
-
-            marginRight: collapsed ? "auto" : 0,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-        {!collapsed && (
-          <div>
-            <div
-              style={{
-                fontWeight: 700,
-
-                fontSize: 14,
-
-                color: "#0F172A",
-
-                letterSpacing: "-0.02em",
-              }}
-            >
-              StartupMatch
-            </div>
-            <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>
-              Regional Admin · Tagum
-            </div>
-          </div>
-        )}
-      </div>
-      <nav style={{ padding: "10px 0", flex: 1 }}>
-        {adminNavItems.map(({ icon: Icon, label, id }) => {
-          const isActive = active === id;
-
-          return (
-            <button
-              key={id}
-              onClick={() => onNav(id)}
-              style={{
-                width: "100%",
-
-                display: "flex",
-
-                alignItems: "center",
-
-                gap: 11,
-
-                padding: collapsed ? "11px 0" : "11px 20px",
-
-                justifyContent: collapsed ? "center" : "flex-start",
-
-                border: "none",
-
-                background: isActive ? "#EFF6FF" : "transparent",
-
-                color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
-
-                cursor: "pointer",
-
-                fontFamily: "Inter, sans-serif",
-
-                fontSize: 13.5,
-
-                fontWeight: isActive ? 600 : 500,
-
-                transition: "all 0.12s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "#F8FAFC";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "transparent";
-              }}
-            >
-              <Icon size={18} />
-              {!collapsed && label}
-            </button>
-          );
-        })}
-      </nav>
-      {!collapsed && (
-        <div
-          style={{
-            padding: "14px 18px",
-
-            borderTop: "1px solid #F1F5F9",
-
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 32,
-
-                height: 32,
-
-                borderRadius: "50%",
-
-                flexShrink: 0,
-
-                background: "linear-gradient(135deg, #1E3A5F, #2563EB)",
-
-                display: "flex",
-
-                alignItems: "center",
-
-                justifyContent: "center",
-
-                fontSize: 11,
-
-                fontWeight: 700,
-
-                color: "#fff",
-              }}
-            >
-              {profile.initials}
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
-                {profile.name}
-              </div>
-              <div style={{ fontSize: 11, color: "#64748B" }}>
-                Regional Administrator
-              </div>
-            </div>
-          </div>
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "1.5px solid #E2E8F0",
-                background: "#fff",
-                color: "#475569",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "Inter, sans-serif",
-              }}
-            >
-              Logout
-            </button>
-          )}
-        </div>
-      )}
-    </aside>
-  );
-}
-
+// Admin's own sidebar (AdminSidebar, below) is reused here instead of a
+// separate analytics-only sidebar — it already covers every page admin can
+// reach, so this page needs no nav logic of its own.
 function EnterpriseAnalyticsPage({
   isMobile,
 
@@ -14070,7 +13847,7 @@ function EnterpriseAnalyticsPage({
 
   onLogout,
 
-  onViewAuditLog,
+  onAdminNav,
 }: {
   isMobile: boolean;
 
@@ -14084,11 +13861,9 @@ function EnterpriseAnalyticsPage({
 
   onLogout?: () => void;
 
-  onViewAuditLog?: () => void;
+  onAdminNav?: (id: string) => void;
 }) {
   const profile = useDevProfile();
-
-  const [analyticsNav, setAnalyticsNav] = useState("analytics");
 
   const [dateRange, setDateRange] = useState("Academic Year 2026");
 
@@ -14200,15 +13975,14 @@ function EnterpriseAnalyticsPage({
               : {}
           }
         >
-          <AnalyticsAdminSidebar
-            active={analyticsNav}
+          <AdminSidebar
+            active="analytics"
             onNav={(id) => {
-              setAnalyticsNav(id);
+              onAdminNav?.(id);
 
               setSidebarOpen(false);
             }}
             collapsed={collapsed}
-            onLogout={onLogout}
           />
         </div>
       )}
@@ -15084,7 +14858,7 @@ function EnterpriseAnalyticsPage({
                 </div>
               </div>
               <button
-                onClick={onViewAuditLog}
+                onClick={() => onAdminNav?.("auditlogs")}
                 style={{
                   fontSize: 12.5,
 
@@ -15389,10 +15163,11 @@ export default function App() {
   const visiblePages = useMemo<AppPage[]>(() => {
     try {
       if (!isAuthenticated) return [] as AppPage[];
-      // Best practice: enterprise and student are sidebar-only — hide floating
-      // pill entirely (their sidebars now carry every page, including the
-      // cross-page jump the switcher used to be the only way to make).
-      if (appRole === "enterprise" || appRole === "student") return [] as AppPage[];
+      // Best practice: every role is sidebar-only now — hide the floating
+      // pill entirely (each role's sidebar carries every page it can reach,
+      // including the cross-page jump the switcher used to be the only way
+      // to make — AdminSidebar for admin, as of the admin nav rework).
+      if (appRole === "enterprise" || appRole === "student" || appRole === "admin") return [] as AppPage[];
 
       const allowed = getAllowedPages(appRole);
 
@@ -15504,6 +15279,33 @@ export default function App() {
 
     setSidebarOpen(false);
   };
+
+  // Single admin-only nav handler — AdminSidebar renders the same way on
+  // every page admin can reach (developer/admin/sprint/milestone/analytics),
+  // all routed through here, so admin never needs the floating bottom page
+  // switcher the way student/enterprise don't (see visiblePages below).
+  const onAdminNav = (id: string) => {
+    if (id === "profile") setPage("developer");
+    else if (id === "sprint") setPage("sprint");
+    else if (id === "milestone") setPage("milestone");
+    else if (id === "analytics") setPage("analytics");
+    else {
+      setPage("admin");
+      setAdminNav(id); // verification / auditlogs / settings
+    }
+    setSidebarOpen(false);
+  };
+
+  const adminActiveNavId =
+    page === "developer"
+      ? "profile"
+      : page === "sprint"
+        ? "sprint"
+        : page === "milestone"
+          ? "milestone"
+          : page === "analytics"
+            ? "analytics"
+            : adminNav;
 
   // ─── Sign-in application ────────────────────────────────────────────────
   // Shared by AuthPage's onSignedIn callback and the session-restore effect
@@ -15709,21 +15511,28 @@ export default function App() {
                     : {}
                 }
               >
-                <DevSidebar
-                  active={devNav === "dashboard" ? "profile" : devNav}
-                  onNav={(id) => {
-                    if (id === "sprintoverview" || id === "sprint") {
-                      setSprintNav(id === "sprint" ? "sprint" : "dashboard");
-                      setPage("sprint");
-                    } else {
-                      setDevNav(id === "profile" ? "dashboard" : id);
-                    }
+                {appRole === "admin" ? (
+                  <AdminSidebar
+                    active={adminActiveNavId}
+                    onNav={onAdminNav}
+                    collapsed={collapsed}
+                  />
+                ) : (
+                  <DevSidebar
+                    active={devNav === "dashboard" ? "profile" : devNav}
+                    onNav={(id) => {
+                      if (id === "sprintoverview" || id === "sprint") {
+                        setSprintNav(id === "sprint" ? "sprint" : "dashboard");
+                        setPage("sprint");
+                      } else {
+                        setDevNav(id === "profile" ? "dashboard" : id);
+                      }
 
-                    setSidebarOpen(false);
-                  }}
-                  collapsed={collapsed}
-                  appRole={appRole}
-                />
+                      setSidebarOpen(false);
+                    }}
+                    collapsed={collapsed}
+                  />
+                )}
               </div>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -15899,12 +15708,8 @@ export default function App() {
               }
             >
               <AdminSidebar
-                active={adminNav}
-                onNav={(id) => {
-                  setAdminNav(id);
-
-                  setSidebarOpen(false);
-                }}
+                active={adminActiveNavId}
+                onNav={onAdminNav}
                 collapsed={collapsed}
               />
             </div>
@@ -16132,23 +15937,30 @@ export default function App() {
                     : {}
                 }
               >
-                <SprintSidebar
-                  active={sprintNav === "dashboard" ? "sprintoverview" : sprintNav}
-                  onNav={(id) => {
-                    if (id === "sprintoverview") {
-                      setSprintNav("dashboard");
-                    } else if (id === "sprint") {
-                      setSprintNav("sprint");
-                    } else {
-                      setPage("developer");
-                      setDevNav(id === "profile" ? "dashboard" : id);
-                    }
+                {appRole === "admin" ? (
+                  <AdminSidebar
+                    active={adminActiveNavId}
+                    onNav={onAdminNav}
+                    collapsed={collapsed}
+                  />
+                ) : (
+                  <SprintSidebar
+                    active={sprintNav === "dashboard" ? "sprintoverview" : sprintNav}
+                    onNav={(id) => {
+                      if (id === "sprintoverview") {
+                        setSprintNav("dashboard");
+                      } else if (id === "sprint") {
+                        setSprintNav("sprint");
+                      } else {
+                        setPage("developer");
+                        setDevNav(id === "profile" ? "dashboard" : id);
+                      }
 
-                    setSidebarOpen(false);
-                  }}
-                  collapsed={collapsed}
-                  appRole={appRole}
-                />
+                      setSidebarOpen(false);
+                    }}
+                    collapsed={collapsed}
+                  />
+                )}
               </div>
             )}
             <div
@@ -16414,6 +16226,8 @@ export default function App() {
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             onLogout={handleLogout}
+            appRole={appRole}
+            onAdminNav={onAdminNav}
           />
         )
       ) : (
@@ -16426,10 +16240,7 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
           onLogout={handleLogout}
-          onViewAuditLog={() => {
-            setPage("admin");
-            setAdminNav("auditlogs");
-          }}
+          onAdminNav={onAdminNav}
         />
       )}
     </div>
