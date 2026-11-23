@@ -10509,7 +10509,7 @@ function BidsReceivedPanel() {
           <div key={projectId} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: "#334155" }}>{group.title}</div>
-              {group.bids.length > 1 && (
+              {group.bids.length >= 1 && (
                 <button
                   onClick={() => setRankingProject({ id: projectId, title: group.title, tags: group.tags })}
                   style={{
