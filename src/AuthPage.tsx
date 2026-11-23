@@ -997,7 +997,6 @@ export default function AuthPage({ onSignedIn }: {
         display: "flex",
 
         fontFamily: "Inter, sans-serif",
-        paddingBottom: footerHeight + 16,
         overflowX: "hidden",
       }}
     >
@@ -1120,6 +1119,7 @@ export default function AuthPage({ onSignedIn }: {
           flexDirection: "column",
 
           background: "#F8FAFC",
+          paddingBottom: footerHeight + 16,
         }}
       >
         {/* Mobile / tablet top banner (<1024px) */}
