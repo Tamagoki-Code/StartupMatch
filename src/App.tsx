@@ -7881,60 +7881,42 @@ function SprintOverview({
 
 // ─── Project Spec Form ────────────────────────────────────────────────────────
 
-const TECH_TAGS = [
-  "React",
-
-  "Next.js",
-
-  "Vue.js",
-
-  "Angular",
-
-  "TypeScript",
-
-  "JavaScript",
-
-  "Node.js",
-
-  "Express.js",
-
-  "Laravel",
-
-  "Django",
-
-  "Firebase",
-
-  "Supabase",
-
-  "PostgreSQL",
-
-  "MySQL",
-
-  "MongoDB",
-
-  "Tailwind CSS",
-
-  "Bootstrap",
-
-  "Android",
-
-  "iOS",
-
-  "Flutter",
-
-  "React Native",
-
-  "REST API",
-
-  "GraphQL",
-
-  "Docker",
-
-  "Vercel",
-
-  "AWS",
-
-  "Google Cloud",
+// Replaces asking a non-technical business owner to pick specific
+// technologies (React, Django, etc. — meaningless to someone who isn't a
+// developer) with plain outcomes. Each maps to a reasonable starting tag
+// set; students still read the full description for the real detail, and
+// these tags are display/filter-only (not an input to resume matching).
+const PROJECT_OUTCOMES: { label: string; description: string; tags: string[] }[] = [
+  {
+    label: "A website customers can visit",
+    description: "A public site — landing page, catalog, booking page, etc.",
+    tags: ["React", "Tailwind CSS"],
+  },
+  {
+    label: "A mobile app",
+    description: "An app customers or staff install on their phone.",
+    tags: ["React Native", "Android", "iOS"],
+  },
+  {
+    label: "A system to manage my business",
+    description: "Inventory, orders, bookings, staff — an internal tool.",
+    tags: ["React", "Node.js", "PostgreSQL"],
+  },
+  {
+    label: "A way to accept online payments or orders",
+    description: "Customers pay or order through the system itself.",
+    tags: ["Node.js", "REST API"],
+  },
+  {
+    label: "An admin dashboard for my team",
+    description: "A private panel to view and manage data.",
+    tags: ["React", "PostgreSQL"],
+  },
+  {
+    label: "Not sure — let the student suggest the best approach",
+    description: "The student will recommend the right technology for you.",
+    tags: [],
+  },
 ];
 
 const BARANGAYS = [
@@ -8320,15 +8302,14 @@ function ProjectSpecForm({
 
   const [scope, setScope] = useState("");
 
-  const [selectedTags, setSelectedTags] = useState<string[]>([
-    "React",
-
-    "Firebase",
-
-    "Tailwind CSS",
-  ]);
-
-  const [tagSearch, setTagSearch] = useState("");
+  const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
+  const selectedTags = useMemo(
+    () => [...new Set(PROJECT_OUTCOMES.filter((o) => selectedOutcomes.includes(o.label)).flatMap((o) => o.tags))],
+    [selectedOutcomes],
+  );
+  function toggleOutcome(label: string) {
+    setSelectedOutcomes((prev) => (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]));
+  }
 
   const [numPhases, setNumPhases] = useState("3");
 
@@ -8364,10 +8345,6 @@ function ProjectSpecForm({
 
   const [scopeFocused, setScopeFocused] = useState(false);
 
-  const [tagInputFocused, setTagInputFocused] = useState(false);
-
-  const tagDropdownRef = useRef<HTMLDivElement>(null);
-
   // Sync milestone count to numPhases
 
   useEffect(() => {
@@ -8393,12 +8370,6 @@ function ProjectSpecForm({
       return prev.slice(0, n);
     });
   }, [numPhases]);
-
-  function toggleTag(tag: string) {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
-  }
 
   function updateMilestone(
     id: string,
@@ -8528,12 +8499,6 @@ function ProjectSpecForm({
       window.alert(err instanceof Error ? err.message : "Failed to delete draft");
     }
   }
-
-  const filteredTags = TECH_TAGS.filter(
-    (t) =>
-      !selectedTags.includes(t) &&
-      t.toLowerCase().includes(tagSearch.toLowerCase()),
-  );
 
   if (published) {
     return (
@@ -9275,301 +9240,60 @@ function ProjectSpecForm({
                     </div>
                   </div>
 
-                  {/* Tech stack tag picker */}
+                  {/* Plain-language project type picker — a business owner
+                      shouldn't need to know what React or Django are to post
+                      a project. Each option maps to a sensible tag set
+                      internally; students still read the scope description
+                      above for the real detail. */}
                   <div>
-                    <FormLabel>Required Tech Stack</FormLabel>
-                    <div
-                      style={{
-                        display: "flex",
-
-                        flexWrap: "wrap",
-
-                        gap: 7,
-
-                        marginBottom: selectedTags.length > 0 ? 10 : 0,
-                      }}
-                    >
-                      {selectedTags.map((tag) => (
-                        <span
-                          key={tag}
-                          style={{
-                            display: "inline-flex",
-
-                            alignItems: "center",
-
-                            gap: 5,
-
-                            padding: "4px 10px 4px 12px",
-
-                            borderRadius: 99,
-
-                            background: "#EFF6FF",
-
-                            border: "1.5px solid #2563EB",
-
-                            color: "#2563EB",
-
-                            fontSize: 12.5,
-
-                            fontWeight: 700,
-                          }}
-                        >
-                          {tag}
-                          <button
-                            onClick={() => toggleTag(tag)}
+                    <FormLabel>What kind of project is this?</FormLabel>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {PROJECT_OUTCOMES.map((outcome) => {
+                        const checked = selectedOutcomes.includes(outcome.label);
+                        return (
+                          <label
+                            key={outcome.label}
                             style={{
-                              background: "none",
+                              display: "flex",
 
-                              border: "none",
+                              alignItems: "flex-start",
+
+                              gap: 10,
+
+                              padding: "12px 14px",
+
+                              borderRadius: 10,
+
+                              border: `1.5px solid ${checked ? "#2563EB" : "#E2E8F0"}`,
+
+                              background: checked ? "#EFF6FF" : "#fff",
 
                               cursor: "pointer",
 
-                              color: "#93C5FD",
-
-                              padding: 0,
-
-                              lineHeight: 0,
-
-                              display: "flex",
+                              transition: "all 0.12s",
                             }}
                           >
-                            <IconX size={10} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                    {/* Tag search / picker */}
-                    <div style={{ position: "relative" }} ref={tagDropdownRef}>
-                      <div
-                        style={{
-                          display: "flex",
-
-                          alignItems: "center",
-
-                          gap: 8,
-
-                          border: `1.5px solid ${
-                            tagInputFocused ? "#2563EB" : "#E2E8F0"
-                          }`,
-
-                          borderRadius: 8,
-
-                          padding: "8px 12px",
-
-                          background: "#fff",
-
-                          boxShadow: tagInputFocused
-                            ? "0 0 0 3px rgba(37,99,235,0.08)"
-                            : "none",
-
-                          transition: "border-color 0.15s",
-                        }}
-                      >
-                        <IconSearch size={14} />
-                        <input
-                          type="text"
-                          value={tagSearch}
-                          onChange={(e) => setTagSearch(e.target.value)}
-                          onFocus={() => setTagInputFocused(true)}
-                          onBlur={() =>
-                            setTimeout(() => setTagInputFocused(false), 150)
-                          }
-                          placeholder="Search and add a technology tag…"
-                          style={{
-                            flex: 1,
-
-                            border: "none",
-
-                            outline: "none",
-
-                            fontSize: 13.5,
-
-                            fontFamily: "Inter, sans-serif",
-
-                            color: "#0F172A",
-
-                            background: "transparent",
-                          }}
-                        />
-                      </div>
-                      {tagInputFocused && filteredTags.length > 0 && (
-                        <div
-                          style={{
-                            position: "absolute",
-
-                            top: "100%",
-
-                            left: 0,
-
-                            right: 0,
-
-                            zIndex: 20,
-
-                            marginTop: 4,
-
-                            background: "#fff",
-
-                            border: "1px solid #E2E8F0",
-
-                            borderRadius: 10,
-
-                            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-
-                            maxHeight: 200,
-
-                            overflowY: "auto",
-                          }}
-                        >
-                          <div style={{ padding: "6px 0" }}>
-                            {filteredTags.slice(0, 12).map((tag) => (
-                              <button
-                                key={tag}
-                                onMouseDown={() => {
-                                  toggleTag(tag);
-
-                                  setTagSearch("");
-                                }}
-                                style={{
-                                  width: "100%",
-
-                                  textAlign: "left",
-
-                                  padding: "8px 14px",
-
-                                  background: "none",
-
-                                  border: "none",
-
-                                  cursor: "pointer",
-
-                                  fontSize: 13.5,
-
-                                  color: "#334155",
-
-                                  fontFamily: "Inter, sans-serif",
-
-                                  display: "flex",
-
-                                  alignItems: "center",
-
-                                  gap: 8,
-                                }}
-                                onMouseEnter={(e) =>
-                                  (e.currentTarget.style.background = "#F8FAFC")
-                                }
-                                onMouseLeave={(e) =>
-                                  (e.currentTarget.style.background =
-                                    "transparent")
-                                }
-                              >
-                                <span
-                                  style={{
-                                    width: 20,
-
-                                    height: 20,
-
-                                    borderRadius: 99,
-
-                                    background: "#EFF6FF",
-
-                                    border: "1px solid #BFDBFE",
-
-                                    display: "flex",
-
-                                    alignItems: "center",
-
-                                    justifyContent: "center",
-
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <svg
-                                    width="10"
-                                    height="10"
-                                    viewBox="0 0 10 10"
-                                    fill="none"
-                                  >
-                                    <path
-                                      d="M5 2v6M2 5h6"
-                                      stroke="#2563EB"
-                                      strokeWidth="1.4"
-                                      strokeLinecap="round"
-                                    />
-                                  </svg>
-                                </span>
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleOutcome(outcome.label)}
+                              style={{ marginTop: 2, cursor: "pointer" }}
+                            />
+                            <div>
+                              <div style={{ fontSize: 13.5, fontWeight: 600, color: "#0F172A" }}>
+                                {outcome.label}
+                              </div>
+                              <div style={{ fontSize: 12.5, color: "#64748B", marginTop: 2 }}>
+                                {outcome.description}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
                     <FormHint>
-                      Click tags to add them. Selected tags guide developer
-                      matching.
+                      Pick whatever applies — a student will confirm the exact approach with you.
                     </FormHint>
-                    {/* All tags quick-add row */}
-                    <div
-                      style={{
-                        display: "flex",
-
-                        flexWrap: "wrap",
-
-                        gap: 6,
-
-                        marginTop: 10,
-                      }}
-                    >
-                      {TECH_TAGS.filter((t) => !selectedTags.includes(t))
-
-                        .slice(0, 10)
-
-                        .map((tag) => (
-                          <button
-                            key={tag}
-                            onClick={() => toggleTag(tag)}
-                            style={{
-                              padding: "3px 10px",
-
-                              borderRadius: 99,
-
-                              border: "1px solid #E2E8F0",
-
-                              background: "#F8FAFC",
-
-                              color: "#475569",
-
-                              fontSize: 12,
-
-                              fontWeight: 500,
-
-                              cursor: "pointer",
-
-                              fontFamily: "Inter, sans-serif",
-
-                              transition: "all 0.1s",
-                            }}
-                            onMouseEnter={(e) => {
-                              (
-                                e.currentTarget as HTMLButtonElement
-                              ).style.borderColor = "#2563EB";
-                              (
-                                e.currentTarget as HTMLButtonElement
-                              ).style.color = "#2563EB";
-                            }}
-                            onMouseLeave={(e) => {
-                              (
-                                e.currentTarget as HTMLButtonElement
-                              ).style.borderColor = "#E2E8F0";
-                              (
-                                e.currentTarget as HTMLButtonElement
-                              ).style.color = "#475569";
-                            }}
-                          >
-                            + {tag}
-                          </button>
-                        ))}
-                    </div>
                   </div>
                 </FieldGroup>
               </div>
@@ -11981,7 +11705,7 @@ function MilestoneTrackingPage({
     if (
       appRole === "admin" &&
       !window.confirm(
-        `Approve Sprint ${number} as PSITS Moderator? This immediately releases the milestone payment to the student, on the enterprise client's behalf.`,
+        `Approve Milestone ${number} as PSITS Moderator? This immediately releases the payment to the student, on the enterprise client's behalf.`,
       )
     ) {
       return;
@@ -11998,7 +11722,7 @@ function MilestoneTrackingPage({
     if (
       appRole === "admin" &&
       !window.confirm(
-        `File this dispute as PSITS Moderator on Sprint ${number}? The student will be notified it was flagged by a moderator, not the client.`,
+        `File this dispute as PSITS Moderator on Milestone ${number}? The student will be notified it was flagged by a moderator, not the client.`,
       )
     ) {
       return;
@@ -12641,9 +12365,9 @@ function MilestoneTrackingPage({
             >
               {[
                 {
-                  label: "Current Sprint Phase",
+                  label: "Current Milestone",
 
-                  value: `Phase ${Math.min(verified + 1, total)} of ${total}`,
+                  value: `Milestone ${Math.min(verified + 1, total)} of ${total}`,
 
                   icon: "🔄",
 
@@ -13047,7 +12771,7 @@ function MilestoneTrackingPage({
                                 color: "#0F172A",
                               }}
                             >
-                              Sprint {phase.num}: {phase.title}
+                              Milestone {phase.num}: {phase.title}
                             </span>
                             <span
                               style={{
@@ -13693,7 +13417,7 @@ function MilestoneTrackingPage({
                                   onClick={() => {
                                     if (
                                       window.confirm(
-                                        `Cancel the review on Sprint ${phase.num}? This sends it back to the student unreviewed — no approval or dispute is recorded, and they'll need to resubmit.`,
+                                        `Cancel the review on Milestone ${phase.num}? This sends it back to the student unreviewed — no approval or dispute is recorded, and they'll need to resubmit.`,
                                       )
                                     ) {
                                       reviseSubmission(phase.num);
@@ -13916,7 +13640,7 @@ function MilestoneTrackingPage({
                   <div
                     style={{ fontSize: 11.5, color: "#64748B", marginTop: 1 }}
                   >
-                    Sprint 2 · Active Sprint
+                    Milestone {discussionPhaseNumber}
                   </div>
                 </div>
                 {stacked && (
