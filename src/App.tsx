@@ -10060,9 +10060,21 @@ function ProjectSpecForm({
               <button onClick={() => setTermsOpen(false)} aria-label="Close" style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18 }}>×</button>
             </div>
             <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
-              <p><strong>Startup-Match Terms of Service</strong></p>
-              <p>By publishing a project requirement, you confirm this is a legitimate engagement request and agree to use the platform solely for legitimate project collaboration within the PSITS Tagum ecosystem.</p>
-              <p>Milestone escrow, verification vetting, and admin audit logs are provided as decision-support tools. The platform reserves the right to suspend unverified or disputed accounts pending PSITS Moderator review, and authorizes platform admins to mediate any disputes arising from milestone delivery.</p>
+              <p>By publishing this project requirement, you confirm it is a legitimate engagement request and agree to the following for every milestone awarded against it:</p>
+              <p><strong>1. Your review window</strong></p>
+              <p>Once a Student submits a milestone, you have <strong>5 business days</strong> to Approve or Dispute it. A milestone you leave un-reviewed past that window may be escalated by the Student for PSITS Moderator review — the Student is not penalized for a delay on your side, and the Moderator may approve the milestone on the Student's behalf if you remain unresponsive.</p>
+              <p><strong>2. The Student's grace period</strong></p>
+              <p>A Student's deadline is not treated as missed until <strong>3 calendar days after</strong> the stated date. Only a submission still outstanding past that grace period is automatically flagged as overdue/disputed — the platform does not penalize a Student for being a day or two late with no advance notice.</p>
+              <p><strong>3. Deadline extensions for academic conflicts</strong></p>
+              <p>Students may request an extension for officially declared school activities (examinations, required events). You're expected to accommodate a reasonable, good-faith request; declining one without reason is itself disputable before a Moderator.</p>
+              <p><strong>4. Scope stays fixed at award</strong></p>
+              <p>The milestone titles, deadlines, and budget you set when publishing (and that the awarded bid accepted) are the agreed scope. Asking for materially more than that scope requires either adjusting the deadline, the payout, or both — agreed with the Student, not assumed.</p>
+              <p><strong>5. Revisions</strong></p>
+              <p>Up to <strong>2 revision rounds per milestone</strong> are included within the original deadline. A third round or later is a new, separately scoped request.</p>
+              <p><strong>6. Payment is non-revocable once approved</strong></p>
+              <p>Once you mark a milestone "Approved," that phase's payout is considered earned by the Student. A later dispute on a different milestone cannot claw back payment already approved on this one.</p>
+              <p><strong>7. Disputes</strong></p>
+              <p>Either you or the Student may raise a dispute on a specific milestone. PSITS Moderators mediate using the platform's audit log (submission timestamps, comments, status history) as the record of what happened, and aim to respond within 5 business days.</p>
               <p>For full terms contact your PSITS chapter administrator.</p>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>

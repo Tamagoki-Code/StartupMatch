@@ -2128,10 +2128,26 @@ export default function AuthPage({ onSignedIn }: {
               <button onClick={() => setTosOpen(false)} aria-label="Close Terms of Service" style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18 }}>×</button>
             </div>
             <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
-              <p><strong>Startup-Match Terms of Service</strong></p>
-              <p>By creating an account, you agree to use the platform solely for legitimate project collaboration within the PSITS Tagum ecosystem. Verified PSITS membership, accurate business permits, and honest milestone submissions are required.</p>
-              <p>Milestone escrow, verification vetting, and admin audit logs are provided as decision-support tools. The platform reserves the right to suspend unverified or disputed accounts pending PSITS Moderator review.</p>
-              <p>For full terms contact your PSITS chapter administrator.</p>
+              <p><strong>1. What Startup-Match Is</strong></p>
+              <p>Startup-Match is a matching and project-tracking platform connecting verified PSITS student developers with local Tagum City businesses ("Enterprises") for short-term software projects. Startup-Match is <strong>not</strong> a party to any contract formed between a Student and an Enterprise, is <strong>not</strong> the employer of either party, and does not guarantee project outcomes, payment amounts, or availability of work. Nothing on this platform creates an employment, partnership, or agency relationship between Startup-Match, PSITS, the Student, or the Enterprise.</p>
+              <p><strong>2. Accounts & Verification</strong></p>
+              <p>Students verify with a valid academic ID; Enterprises verify with a valid DTI business permit. Accounts remain "Pending Review" until a PSITS Moderator approves them. Providing false identity, academic, or business information is grounds for immediate suspension and removal from the platform.</p>
+              <p><strong>3. Student Time & Schedule Protections</strong></p>
+              <ul style={{ margin: "4px 0", paddingLeft: 18 }}>
+                <li>Enterprises must review a submitted milestone within <strong>5 business days</strong>. A milestone left un-reviewed past that window may be escalated by the Student for Moderator review, and the Student is not penalized for an Enterprise's delay.</li>
+                <li>A Student's own submission deadline is not considered missed until <strong>3 calendar days after</strong> the stated deadline (grace period) — automated reminders are sent before that point, and only an unresolved miss past the grace period is auto-flagged for dispute.</li>
+                <li>Students may request a deadline extension for officially declared academic activities (examination periods, required school events). Enterprises are expected to accommodate a reasonable, good-faith extension request; an unreasonable refusal is itself disputable.</li>
+                <li>Project scope is fixed at contract award. Material scope additions beyond the agreed milestone description require either a deadline extension, a revised payout, or both — agreed by both parties before the Student is expected to act on them.</li>
+                <li>Revisions are capped at <strong>2 rounds per milestone</strong> within the original deadline. Further revisions are a new, separately scoped and separately paid request.</li>
+              </ul>
+              <p><strong>4. Payment & Milestone Escrow</strong></p>
+              <p>Payout per phase is fixed at contract award (total budget ÷ number of phases) and is tracked, not processed, by the platform — Startup-Match does not hold or transfer funds. Once an Enterprise marks a milestone "Approved," that milestone's payout is considered earned and non-revocable; a later dispute cannot claw back payment for already-approved work.</p>
+              <p><strong>5. Disputes</strong></p>
+              <p>Either party may raise a dispute on a specific milestone. PSITS Moderators mediate disputes using the platform's audit log (phase history, submission timestamps, comments) as the record of what actually happened, and aim to respond within 5 business days of a dispute being raised. Mediation outcomes may include: extending a deadline, approving a milestone as submitted, requiring a specific revision, or — only for conduct that violates these Terms — suspending an account.</p>
+              <p><strong>6. Conduct</strong></p>
+              <p>Honest milestone submissions, accurate business/academic information, and good-faith communication are required of both sides. Startup-Match reserves the right to suspend any account for verified false information, harassment, or repeated unresolved disputes attributable to one party.</p>
+              <p><strong>7. Contact</strong></p>
+              <p>For questions about these Terms, contact your PSITS chapter administrator.</p>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
               <button onClick={() => setTosOpen(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
@@ -2156,10 +2172,20 @@ export default function AuthPage({ onSignedIn }: {
               <button onClick={() => setEulaOpen(false)} aria-label="Close EULA" style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18 }}>×</button>
             </div>
             <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
-              <p><strong>Startup-Match EULA</strong></p>
-              <p>Startup-Match is licensed, not sold. You may use the software to post projects, bid, track milestones, and manage contracts per your verified role (Student, Enterprise, PSITS Moderator).</p>
-              <p>Do not reverse engineer, resell, or use automated scraping against the milestone API. Intellectual property of submitted wireframes and code remains with the author; enterprise clients receive usage rights per awarded contract budget.</p>
-              <p>By agreeing, you consent to PSITS verification logging and milestone telemetry collection for regional analytics.</p>
+              <p><strong>1. License</strong></p>
+              <p>Startup-Match is licensed, not sold. You receive a limited, revocable, non-transferable right to access the platform to post projects, bid, track milestones, and manage contracts under your verified role (Student, Enterprise, or PSITS Moderator). This license ends automatically if your account is suspended or you stop being a verified PSITS student, verified local Enterprise, or appointed Moderator.</p>
+              <p><strong>2. Prohibited Uses</strong></p>
+              <ul style={{ margin: "4px 0", paddingLeft: 18 }}>
+                <li>Reverse engineering, decompiling, or scraping the platform or its APIs (including the milestone/bidding endpoints) outside normal browser use.</li>
+                <li>Reselling, sublicensing, or providing platform access to anyone outside your verified account.</li>
+                <li>Using a bid, award, or milestone as a pretext to route payment or communication entirely outside the platform in a way designed to avoid the dispute-resolution process in the Terms of Service.</li>
+              </ul>
+              <p><strong>3. Ownership of Submitted Work</strong></p>
+              <p>Code, designs, and other deliverables a Student submits remain the Student's intellectual property <strong>until the corresponding milestone is marked "Approved."</strong> Upon approval, the Enterprise receives a usage license to that specific deliverable scoped to the awarded contract's budget and purpose — not a blanket transfer of all rights, and not retroactive to unapproved or disputed work. Portfolio display of completed, approved work (with client name) is permitted for the Student unless the Enterprise explicitly requests confidentiality in writing before award.</p>
+              <p><strong>4. Data & Telemetry</strong></p>
+              <p>By using the platform you consent to: PSITS verification logging (your submitted ID/permit documents, reviewed by Moderators only); milestone and bid activity logging (used for dispute mediation and regional analytics); and a presence signal (last-active timestamp) visible to Moderators and your own contract counterpart while a contract is active. Verification documents are not shared publicly.</p>
+              <p><strong>5. No Warranty / Limitation of Liability</strong></p>
+              <p>The platform is provided "as is," as a matching and tracking tool only. Startup-Match does not guarantee the accuracy of any party's profile, the quality of delivered work, or the outcome of any dispute, and is not liable for losses arising from a Student–Enterprise contract — that relationship and its risks are between the Student and the Enterprise.</p>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
               <button onClick={() => setEulaOpen(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
