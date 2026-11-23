@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useLayoutEffect } from "react"
 
 import { signInUser, signUpUser, requestPasswordReset } from "./supabaseAuth"
 import { uploadVerificationDocument } from "./cloudinary"
@@ -816,6 +816,20 @@ export default function AuthPage({ onSignedIn }: {
   const [forgotStatus, setForgotStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [forgotError, setForgotError] = useState<string | null>(null)
 
+  // The site-wide terms footer is `position: fixed`, so the page needs
+  // bottom padding to match — a static guess breaks on narrow screens where
+  // the footer's copy wraps to 3 lines and gets much taller than desktop.
+  const footerRef = useRef<HTMLDivElement>(null)
+  const [footerHeight, setFooterHeight] = useState(60)
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (footerRef.current) setFooterHeight(footerRef.current.offsetHeight)
+    }
+    measure()
+    window.addEventListener("resize", measure)
+    return () => window.removeEventListener("resize", measure)
+  }, [])
+
   // Persistence: write agreed to localStorage — fail silently on quota/security
   useEffect(() => {
     try {
@@ -983,7 +997,8 @@ export default function AuthPage({ onSignedIn }: {
         display: "flex",
 
         fontFamily: "Inter, sans-serif",
-        paddingBottom: 72,
+        paddingBottom: footerHeight + 16,
+        overflowX: "hidden",
       }}
     >
       {/* ── LEFT: Branding panel (desktop, ≥1024px) ───────────────────── */}
@@ -2112,6 +2127,7 @@ export default function AuthPage({ onSignedIn }: {
         </div>
       </div>
       <div
+        ref={footerRef}
         style={{
           position: "fixed",
           left: 0,

@@ -1295,7 +1295,8 @@ function VerificationQueue({
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — horizontally scrollable so all three stay reachable on a
+          narrow viewport instead of the last tab(s) being clipped. */}
       <div
         style={{
           borderBottom: "1px solid #E2E8F0",
@@ -1305,6 +1306,8 @@ function VerificationQueue({
           display: "flex",
 
           gap: 0,
+
+          overflowX: "auto",
         }}
       >
         {(
@@ -8452,7 +8455,7 @@ function ProjectSpecForm({
 
           borderBottom: "1px solid #E2E8F0",
 
-          padding: "0 32px",
+          padding: isMobile ? "0 16px" : "0 32px",
 
           height: 58,
 
@@ -8472,7 +8475,7 @@ function ProjectSpecForm({
         }}
       >
         {/* Logo + back link */}
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 12 : 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <div
               style={{
@@ -8503,21 +8506,23 @@ function ProjectSpecForm({
                 />
               </svg>
             </div>
-            <span
-              style={{
-                fontWeight: 800,
+            {!isMobile && (
+              <span
+                style={{
+                  fontWeight: 800,
 
-                fontSize: 15,
+                  fontSize: 15,
 
-                color: "#0F172A",
+                  color: "#0F172A",
 
-                letterSpacing: "-0.02em",
-              }}
-            >
-              StartupMatch
-            </span>
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                StartupMatch
+              </span>
+            )}
           </div>
-          <div style={{ width: 1, height: 20, background: "#E2E8F0" }} />
+          {!isMobile && <div style={{ width: 1, height: 20, background: "#E2E8F0" }} />}
           <button
             onClick={onBack}
             style={{
@@ -8543,6 +8548,8 @@ function ProjectSpecForm({
 
               padding: 0,
 
+              whiteSpace: "nowrap",
+
               transition: "color 0.12s",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "#2563EB")}
@@ -8557,7 +8564,7 @@ function ProjectSpecForm({
                 strokeLinejoin="round"
               />
             </svg>
-            Back to Client Dashboard
+            {isMobile ? "Back" : "Back to Client Dashboard"}
           </button>
         </div>
 
@@ -14530,7 +14537,7 @@ function EnterpriseAnalyticsPage({
                     strokeLinejoin="round"
                   />
                 </svg>
-                {!isMobile && "Export Report"} (PDF/Excel)
+                {isMobile ? "Export (PDF/Excel)" : "Export Report (PDF/Excel)"}
               </button>
             </div>
           </div>
