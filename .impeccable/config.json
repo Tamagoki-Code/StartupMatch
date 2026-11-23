@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-09-04T21:11:18.734Z",
+        "reason": "project's own design-token spec (src/imports/startup-match-figma-prompts.md) specifies Inter; pre-existing choice, not introduced this session"
+      }
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+# No LFS tracking required for this project
+# Previously tracked ~80 binary patterns via Git LFS, but no LFS objects exist
+# (git lfs ls-files is empty). Re-add selectively with `git lfs track "<pattern>"`
+# if large binaries are needed in the future. LFS locksverify disabled via:
+#   git config lfs.https://github.com/lcm-conrad/startup-match.git/info/lfs.locksverify false
