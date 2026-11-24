@@ -302,9 +302,9 @@ function IconChevron({
 }: {
   size?: number;
 
-  dir?: "down" | "up" | "right";
+  dir?: "down" | "up" | "right" | "left";
 }) {
-  const rot = dir === "up" ? 180 : dir === "right" ? -90 : 0;
+  const rot = dir === "up" ? 180 : dir === "right" ? -90 : dir === "left" ? 90 : 0;
 
   return (
     <svg
@@ -734,6 +734,8 @@ const adminNavItems = [
   { icon: IconChart, label: "Enterprise Analytics", id: "analytics" },
 
   { icon: IconLogs, label: "Audit Logs", id: "auditlogs" },
+
+  { icon: IconMessages, label: "Messages", id: "messages" },
 
   { icon: IconSettings, label: "Settings", id: "settings" },
 ];
@@ -10283,6 +10285,22 @@ const phaseCfg = {
 
     dot: "#CBD5E1",
   },
+
+  inprogress: {
+    border: "#CBD5E1",
+
+    bg: "#F8FAFC",
+
+    badgeBg: "#F1F5F9",
+
+    badgeColor: "#475569",
+
+    badgeBorder: "#E2E8F0",
+
+    label: "In Progress",
+
+    dot: "#94A3B8",
+  },
 };
 
 function ClientSidebar({
@@ -11015,9 +11033,105 @@ function NewMessageModal({
   );
 }
 
-function MessagesView() {
+// ─── Contract Activity Log (Enterprise Client) ──────────────────────────────
+// A per-contract audit trail for the business owner. Reuses the same
+// phase/comment data already loaded for Milestone Tracking — no new table,
+// no new RLS: the admin-only `audit_log` table has no contract_id and is
+// readable by admins alone, so scoping *that* log per-contract would need a
+// migration and a new policy. This derives an equivalent timeline client-side
+// instead, rendered with the existing AuditTable component.
+function ContractActivityLog({ isMobile, onBack }: { isMobile: boolean; onBack: () => void }) {
+  const project = useProjectStore();
+
+  const rows: AuditLogRow[] = useMemo(() => {
+    const events: AuditLogRow[] = [];
+    for (const phase of project.phases) {
+      if (phase.submittedAt) {
+        events.push({
+          id: `${phase.number}-submitted`,
+          ts: phase.submittedAt,
+          event: `Milestone ${phase.number} Submitted for Review`,
+          role: "Student Developer",
+          user: project.developer,
+          status: "info",
+        });
+      }
+      for (const c of phase.comments) {
+        events.push({
+          id: c.id,
+          ts: c.time,
+          event:
+            c.role === "admin"
+              ? `Milestone ${phase.number} — Moderator Note`
+              : c.role === "client"
+                ? `Milestone ${phase.number} — Client Feedback`
+                : `Milestone ${phase.number} — Developer Update`,
+          role: c.role === "admin" ? "PSITS Moderator" : c.role === "client" ? "Enterprise Client" : "Student Developer",
+          user: c.author,
+          status: c.role === "admin" ? "warning" : "info",
+        });
+      }
+      if (phase.status === "disputed" && phase.revisionReason) {
+        events.push({
+          id: `${phase.number}-disputed`,
+          ts: phase.submittedAt ?? "—",
+          event: `Milestone ${phase.number} Disputed: ${phase.revisionReason}`,
+          role: "Enterprise Client",
+          user: project.client,
+          status: "warning",
+        });
+      }
+      if (phase.approvedAt) {
+        events.push({
+          id: `${phase.number}-approved`,
+          ts: phase.approvedAt,
+          event: `Milestone ${phase.number} Verified${phase.score ? ` — Score ${phase.score}/5` : ""}`,
+          role: "Enterprise Client",
+          user: project.client,
+          status: "success",
+        });
+      }
+    }
+    return events.reverse();
+  }, [project]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ margin: "0 0 6px", fontSize: isMobile ? 20 : 24, fontWeight: 800, color: "#0F172A", letterSpacing: "-0.03em" }}>
+            Contract Activity Log
+          </h1>
+          <p style={{ margin: 0, fontSize: 13.5, color: "#64748B" }}>
+            Every submission, comment, dispute, and verification on {project.project}, in order.
+          </p>
+        </div>
+        <button
+          onClick={onBack}
+          style={{ padding: "8px 16px", borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+        >
+          Back
+        </button>
+      </div>
+      <Card style={{ overflow: "hidden", padding: 0 }}>
+        {rows.length === 0 ? (
+          <EmptyState message="No activity yet. Submissions, comments, and milestone decisions will show up here." />
+        ) : (
+          <AuditTable rows={rows} />
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
   const { conversations, loading: conversationsLoading, refresh: refreshConversations } = useConversations();
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Mobile: list and thread are two views of the same panel, not a fixed
+  // split — picking a conversation shows the thread; Back returns to the
+  // list. Desktop keeps the always-visible side-by-side layout.
+  const showThread = !isMobile || activeId !== null;
+  const showList = !isMobile || activeId === null;
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
@@ -11089,7 +11203,8 @@ function MessagesView() {
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ display: "flex", height: 520 }}>
           {/* Conversation list */}
-          <div style={{ width: 260, flexShrink: 0, borderRight: "1px solid #F1F5F9", overflowY: "auto" }}>
+          {showList && (
+          <div style={{ width: isMobile ? "100%" : 260, flexShrink: 0, borderRight: isMobile ? "none" : "1px solid #F1F5F9", overflowY: "auto" }}>
             {conversationsLoading ? (
               <EmptyState message="Loading…" />
             ) : conversations.length === 0 ? (
@@ -11116,6 +11231,7 @@ function MessagesView() {
                   }}
                 >
                   <div
+                    title={isMobile ? c.otherName : undefined}
                     style={{
                       width: 34,
                       height: 34,
@@ -11141,6 +11257,7 @@ function MessagesView() {
                         gap: 6,
                       }}
                     >
+                      {!isMobile && (
                       <span
                         style={{
                           fontSize: 13,
@@ -11153,6 +11270,7 @@ function MessagesView() {
                       >
                         {c.otherName}
                       </span>
+                      )}
                       {c.unreadCount > 0 && (
                         <span
                           style={{
@@ -11185,8 +11303,10 @@ function MessagesView() {
               ))
             )}
           </div>
+          )}
 
           {/* Active thread */}
+          {showThread && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
             {!active ? (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -11203,6 +11323,15 @@ function MessagesView() {
                     gap: 10,
                   }}
                 >
+                  {isMobile && (
+                    <button
+                      onClick={() => setActiveId(null)}
+                      aria-label="Back to conversations"
+                      style={{ border: "none", background: "transparent", padding: 4, marginRight: 2, cursor: "pointer", color: "#475569", display: "flex", alignItems: "center" }}
+                    >
+                      <IconChevron size={16} dir="left" />
+                    </button>
+                  )}
                   <div
                     style={{
                       width: 30,
@@ -11325,6 +11454,7 @@ function MessagesView() {
               </>
             )}
           </div>
+          )}
         </div>
       </Card>
     </div>
@@ -11663,12 +11793,19 @@ function MilestoneTrackingPage({
 
   const clientStatus = (
     s: SprintPhaseStatus,
-  ): "review" | "completed" | "disputed" | "upcoming" => {
+  ): "review" | "completed" | "disputed" | "upcoming" | "inprogress" => {
     if (s === "completed") return "completed";
 
     if (s === "disputed" || s === "revision") return "disputed";
 
-    if (s === "in_review" || s === "active") return "review";
+    if (s === "in_review") return "review";
+
+    // "active" means the developer's turn — unlocked but not submitted yet.
+    // Previously lumped in with "review", which showed the client an Approve
+    // button for work nobody had submitted. This never showed up before
+    // because nothing ever set a phase to "active" until the sprint
+    // auto-advance fix started doing it.
+    if (s === "active") return "inprogress";
 
     return "upcoming";
   };
@@ -12029,9 +12166,13 @@ function MilestoneTrackingPage({
             <div style={{ flex: 1, minWidth: 0 }}>
               <ProjectContractsView isMobile={isMobile} onPostProject={() => setClientNav("specform")} />
             </div>
+          ) : clientNav === "auditlog" ? (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <ContractActivityLog isMobile={isMobile} onBack={() => setClientNav("overview")} />
+            </div>
           ) : clientNav === "messages" ? (
             <div style={{ flex: 1, minWidth: 0 }}>
-              <MessagesView />
+              <MessagesView isMobile={isMobile} />
             </div>
           ) : clientNav === "settings" ? (
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -12281,9 +12422,9 @@ function MilestoneTrackingPage({
                   Show developer details
                 </span>
               </label>
-              {!isMobile && (
-                <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button
+                    onClick={() => setClientNav("auditlog")}
                     style={{
                       padding: "8px 16px",
 
@@ -12313,6 +12454,7 @@ function MilestoneTrackingPage({
                     <IconLogs size={14} /> Audit Log
                   </button>
                   <button
+                    onClick={() => setClientNav("contracts")}
                     style={{
                       padding: "8px 16px",
 
@@ -12342,7 +12484,6 @@ function MilestoneTrackingPage({
                     <IconExternal size={13} /> View Contract
                   </button>
                 </div>
-              )}
             </div>
 
             {/* ── Summary bar ─────────────────────────────────────── */}
@@ -12645,6 +12786,8 @@ function MilestoneTrackingPage({
                 const isDisputed = status === "disputed";
 
                 const isUpcoming = status === "upcoming";
+
+                const isInProgress = status === "inprogress";
 
                 return (
                   <div
@@ -13458,6 +13601,25 @@ function MilestoneTrackingPage({
                               </div>
                             )}
                           </>
+                        )}
+
+                        {/* In progress state — unlocked for the developer, nothing submitted yet */}
+                        {isInProgress && (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "10px 14px",
+                              background: "#F8FAFC",
+                              border: "1px solid #E2E8F0",
+                              borderRadius: 8,
+                              color: "#64748B",
+                              fontSize: 13,
+                            }}
+                          >
+                            Unlocked — waiting on the developer to submit this milestone.
+                          </div>
                         )}
 
                         {/* Disputed / overdue state */}
@@ -15981,7 +16143,7 @@ export default function App() {
                       <ResumeCheckPage />
                     </Suspense>
                   ) : devNav === "messages" ? (
-                    <MessagesView />
+                    <MessagesView isMobile={isMobile} />
                   ) : devNav === "settings" ? (
                     <SettingsView />
                   ) : (
@@ -16207,6 +16369,8 @@ export default function App() {
             >
               {adminNav === "auditlogs" ? (
                 <AuditLogsPage />
+              ) : adminNav === "messages" ? (
+                <MessagesView isMobile={isMobile} />
               ) : adminNav === "settings" ? (
                 <SettingsView />
               ) : (
@@ -16524,7 +16688,7 @@ export default function App() {
                 ) : sprintNav === "bids" ? (
                   <BidsView />
                 ) : sprintNav === "messages" ? (
-                  <MessagesView />
+                  <MessagesView isMobile={isMobile} />
                 ) : (
                   <SettingsView />
                 )}

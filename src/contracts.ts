@@ -523,6 +523,22 @@ export async function approvePhase(number: number, score = 5) {
     .eq("id", phaseId)
   if (phaseErr) throw phaseErr
 
+  // Unlock the next phase — without this, approving a phase leaves the
+  // following one stuck at "upcoming" and the student can never start it.
+  const { data: nextPhase } = await supabase
+    .from("contract_phases")
+    .select("id, status")
+    .eq("contract_id", m.contractId)
+    .eq("number", number + 1)
+    .maybeSingle()
+  if (nextPhase && nextPhase.status === "upcoming") {
+    const { error: advanceErr } = await supabase
+      .from("contract_phases")
+      .update({ status: "active" })
+      .eq("id", nextPhase.id)
+    if (advanceErr) throw advanceErr
+  }
+
   const newPaidToDate = m.paidToDate + m.phasePayout
   const { error: contractErr } = await supabase
     .from("contracts")
