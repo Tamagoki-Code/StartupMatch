@@ -11650,7 +11650,7 @@ function useProfilePhotoActions(isBusiness: boolean) {
     if (!file) return;
     setError(null);
     if (!file.type.startsWith("image/")) return setError("Please choose an image file (JPG or PNG).");
-    if (file.size > 5 * 1024 * 1024) return setError("Please choose an image under 5 MB.");
+    if (file.size > 20 * 1024 * 1024) return setError("Please choose an image under 20 MB.");
     setBusy(true);
     try {
       await setMyAvatarUrl(await uploadVerificationDocument(file, isBusiness ? "business_logos" : "profile_photos"));
@@ -11737,8 +11737,8 @@ function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
       </div>
       <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 6 }}>
         {isBusiness
-          ? "Shown on your project listings and in messages. JPG or PNG, up to 5 MB."
-          : "Shown on your profile and in messages. JPG or PNG, up to 5 MB."}
+          ? "Shown on your project listings and in messages. JPG or PNG, up to 20 MB."
+          : "Shown on your profile and in messages. JPG or PNG, up to 20 MB."}
       </div>
       {photo.error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C", marginTop: 4 }}>{photo.error}</div>}
     </div>
@@ -11867,7 +11867,7 @@ function ProfilePhotoViewer({
             Remove {isBusiness ? "Logo" : "Photo"}
           </button>
         )}
-        <div style={{ fontSize: 11.5, color: "#94A3B8" }}>JPG or PNG, up to 5 MB.</div>
+        <div style={{ fontSize: 11.5, color: "#94A3B8" }}>JPG or PNG, up to 20 MB.</div>
         {photo.error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C" }}>{photo.error}</div>}
       </div>
     </div>
