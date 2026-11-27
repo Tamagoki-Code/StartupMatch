@@ -35,6 +35,7 @@ export interface ConversationRow {
   otherName: string
   otherRole: string
   otherInitials: string
+  otherAvatarUrl: string | null
   lastMessagePreview: string
   lastMessageAt: string
   unreadCount: number
@@ -54,6 +55,7 @@ export interface MessageableProfile {
   name: string
   role: string
   initials: string
+  avatarUrl: string | null
 }
 
 async function fetchConversations(myId: string): Promise<ConversationRow[]> {
@@ -89,8 +91,8 @@ async function fetchConversations(myId: string): Promise<ConversationRow[]> {
   const otherIds = [...new Set(otherPartsRes.data.map((p) => p.profile_id))]
 
   const { data: otherProfiles } = otherIds.length
-    ? await supabase.from("profiles").select("id, name, role").in("id", otherIds)
-    : { data: [] as { id: string; name: string; role: string }[] }
+    ? await supabase.from("profiles").select("id, name, role, avatar_url").in("id", otherIds)
+    : { data: [] as { id: string; name: string; role: string; avatar_url: string | null }[] }
   const profileById = new Map((otherProfiles ?? []).map((p) => [p.id, p]))
 
   const lastMsgByConv = new Map<string, { body: string; created_at: string }>()
@@ -116,6 +118,7 @@ async function fetchConversations(myId: string): Promise<ConversationRow[]> {
         otherName: profile?.name ?? "Unknown User",
         otherRole: profile?.role ?? "",
         otherInitials: initialsFrom(profile?.name ?? "?"),
+        otherAvatarUrl: profile?.avatar_url ?? null,
         lastMessagePreview: lastMsg?.body ?? "No messages yet",
         lastMessageAt: lastMessageAtByConv.get(id) ?? "",
         unreadCount: unreadByConv.get(id) ?? 0,
@@ -266,7 +269,7 @@ export async function searchMessageableProfiles(query: string): Promise<Messagea
 
   let q = supabase
     .from("profiles")
-    .select("id, name, role")
+    .select("id, name, role, avatar_url")
     .in("id", ids)
     .order("name")
     .limit(20)
@@ -280,5 +283,6 @@ export async function searchMessageableProfiles(query: string): Promise<Messagea
     name: p.name,
     role: p.role,
     initials: initialsFrom(p.name),
+    avatarUrl: p.avatar_url ?? null,
   }))
 }

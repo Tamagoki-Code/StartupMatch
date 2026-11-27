@@ -116,6 +116,7 @@ import type { MessageableProfile } from "./messages";
 import { HelpButton, SupportTicketsPage } from "./SupportTickets";
 import { projectDuration, projectTimeline } from "./timeline";
 import { uploadVerificationDocument } from "./cloudinary";
+import { useMyAvatarUrl, setMyAvatarUrl } from "./avatar";
 
 import * as contractsApi from "./contracts";
 
@@ -950,7 +951,7 @@ function AdminSidebar({
                 color: "#fff",
               }}
             >
-              {profile.initials}
+              <MyAvatar kind="person" size={18} />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -2038,7 +2039,7 @@ function DevSidebar({
                 color: "#fff",
               }}
             >
-              {profile.initials}
+              <MyAvatar kind="person" size={18} />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -2587,7 +2588,7 @@ function DeveloperProfile({
                 boxShadow: "0 0 0 2px #E2E8F0",
               }}
             >
-              {p.initials}
+              {isOwnProfile ? <MyAvatar kind="person" size={52} /> : <AvatarIcon kind="person" size={52} />}
             </div>
             <div
               style={{
@@ -3451,8 +3452,6 @@ function BusinessAvatar({ name, url, size = 44 }: { name: string; url?: string |
       />
     );
   }
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const initials = ((words[0]?.[0] ?? "?") + (words[1]?.[0] ?? "")).toUpperCase();
   const palette = ["#2563EB", "#0F766E", "#7C3AED", "#C2410C", "#BE185D", "#15803D"];
   const color = palette[[...name].reduce((h, ch) => h + ch.charCodeAt(0), 0) % palette.length];
   return (
@@ -3465,13 +3464,50 @@ function BusinessAvatar({ name, url, size = 44 }: { name: string; url?: string |
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: size * 0.36,
-        fontWeight: 800,
       }}
     >
-      {initials}
+      <AvatarIcon kind="business" size={Math.round(size * 0.56)} />
     </div>
   );
+}
+
+// Default picture until someone uploads a photo: a person or a building,
+// drawn in the surrounding circle's text color.
+function AvatarIcon({ kind, size }: { kind: "person" | "business"; size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      {kind === "person" ? (
+        <>
+          <circle cx="12" cy="8" r="4.25" />
+          <path d="M3.75 21c0-4.4 3.7-7.5 8.25-7.5s8.25 3.1 8.25 7.5z" />
+        </>
+      ) : (
+        <path
+          fillRule="evenodd"
+          d="M5 3.5A1.5 1.5 0 016.5 2h11A1.5 1.5 0 0119 3.5V20h1.25a.75.75 0 010 1.5H3.75a.75.75 0 010-1.5H5zM8 5.5h2.5V8H8zm5.5 0H16V8h-2.5zM8 10h2.5v2.5H8zm5.5 0H16v2.5h-2.5zM10 15.5h4V20h-4z"
+        />
+      )}
+    </svg>
+  );
+}
+
+function AvatarContent({ kind, url, size }: { kind: "person" | "business"; url?: string | null; size: number }) {
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
+  if (url && url !== brokenUrl) {
+    return (
+      <img
+        src={url}
+        alt=""
+        onError={() => setBrokenUrl(url)}
+        style={{ width: "100%", height: "100%", borderRadius: "inherit", objectFit: "cover", display: "block" }}
+      />
+    );
+  }
+  return <AvatarIcon kind={kind} size={size} />;
+}
+
+function MyAvatar({ kind, size }: { kind: "person" | "business"; size: number }) {
+  return <AvatarContent kind={kind} url={useMyAvatarUrl()} size={size} />;
 }
 
 function MarketplaceFeed({
@@ -4419,7 +4455,7 @@ function SprintSidebar({
                 color: profile.avatarColors[1],
               }}
             >
-              {profile.initials}
+              <MyAvatar kind="person" size={18} />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -10702,7 +10738,7 @@ function ClientSidebar({
                 color: "#065F46",
               }}
             >
-              {client.initials}
+              <MyAvatar kind="business" size={18} />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -11138,7 +11174,7 @@ function NewMessageModal({
                     color: "#1D4ED8",
                   }}
                 >
-                  {p.initials}
+                  <AvatarContent kind={p.role === "enterprise" ? "business" : "person"} url={p.avatarUrl} size={18} />
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{p.name}</div>
@@ -11373,7 +11409,7 @@ function MessagesView({
                       color: "#1D4ED8",
                     }}
                   >
-                    {c.otherInitials}
+                    <AvatarContent kind={c.otherRole === "enterprise" ? "business" : "person"} url={c.otherAvatarUrl} size={19} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -11473,7 +11509,7 @@ function MessagesView({
                       color: "#1D4ED8",
                     }}
                   >
-                    {active.otherInitials}
+                    <AvatarContent kind={active.otherRole === "enterprise" ? "business" : "person"} url={active.otherAvatarUrl} size={17} />
                   </div>
                   <div>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{active.otherName}</div>
@@ -11587,30 +11623,14 @@ function MessagesView({
   );
 }
 
-// Shown on the business's marketplace listings; initials are used when unset.
-function BusinessLogoField({ businessName }: { businessName: string }) {
-  const me = getCachedAuthProfile();
-  const [url, setUrl] = useState<string | null>(null);
+// Profile photo for any role (business logo for enterprises), shared via
+// avatar.ts so every avatar updates right away. An icon is shown until set.
+function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
+  const url = useMyAvatarUrl();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!me) return;
-    supabase
-      .from("profiles")
-      .select("avatar_url")
-      .eq("id", me.id)
-      .single()
-      .then(({ data }) => setUrl((data?.avatar_url as string | null) ?? null));
-  }, [me?.id]);
-
-  async function save(next: string | null) {
-    if (!me) return;
-    const { error: dbError } = await supabase.from("profiles").update({ avatar_url: next }).eq("id", me.id);
-    if (dbError) throw dbError;
-    setUrl(next);
-  }
+  const noun = isBusiness ? "logo" : "photo";
 
   async function onPick(file: File | undefined) {
     if (!file) return;
@@ -11619,9 +11639,9 @@ function BusinessLogoField({ businessName }: { businessName: string }) {
     if (file.size > 5 * 1024 * 1024) return setError("Please choose an image under 5 MB.");
     setBusy(true);
     try {
-      await save(await uploadVerificationDocument(file, "business_logos"));
+      await setMyAvatarUrl(await uploadVerificationDocument(file, isBusiness ? "business_logos" : "profile_photos"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not upload the logo — please retry.");
+      setError(e instanceof Error ? e.message : `Could not upload the ${noun} — please retry.`);
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -11642,24 +11662,42 @@ function BusinessLogoField({ businessName }: { businessName: string }) {
 
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Business Logo</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#334155", marginBottom: 6 }}>
+        {isBusiness ? "Business Logo" : "Profile Photo"}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <BusinessAvatar name={businessName || "Business"} url={url} size={52} />
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: isBusiness ? 12 : "50%",
+            flexShrink: 0,
+            background: "#EFF6FF",
+            border: "1px solid #BFDBFE",
+            color: "#2563EB",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+          }}
+        >
+          <AvatarContent kind={isBusiness ? "business" : "person"} url={url} size={30} />
+        </div>
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
-          aria-label="Upload business logo"
+          aria-label={`Upload ${isBusiness ? "business logo" : "profile photo"}`}
           onChange={(e) => onPick(e.target.files?.[0])}
           style={{ display: "none" }}
         />
         <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} style={linkButton}>
-          {busy ? "Uploading…" : url ? "Change Logo" : "Upload Logo"}
+          {busy ? "Uploading…" : url ? `Change ${isBusiness ? "Logo" : "Photo"}` : `Upload ${isBusiness ? "Logo" : "Photo"}`}
         </button>
         {url && !busy && (
           <button
             type="button"
-            onClick={() => save(null).catch(() => setError("Could not remove the logo — please retry."))}
+            onClick={() => setMyAvatarUrl(null).catch(() => setError(`Could not remove the ${noun} — please retry.`))}
             style={{ ...linkButton, color: "#B91C1C" }}
           >
             Remove
@@ -11667,7 +11705,9 @@ function BusinessLogoField({ businessName }: { businessName: string }) {
         )}
       </div>
       <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 6 }}>
-        Shown on your project listings. Without a logo, your initials are used.
+        {isBusiness
+          ? "Shown on your project listings and in messages. JPG or PNG, up to 5 MB."
+          : "Shown on your profile and in messages. JPG or PNG, up to 5 MB."}
       </div>
       {error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C", marginTop: 4 }}>{error}</div>}
     </div>
@@ -11759,13 +11799,13 @@ function SettingsView() {
             : "Your identity, shown on your developer profile."}
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <ProfilePhotoField isBusiness={isEnterprise} />
           <div>
             <label style={labelStyle}>Full Name</label>
             <input style={inputStyle} value={nameInput} onChange={(e) => setNameInput(e.target.value)} />
           </div>
           {isEnterprise ? (
             <>
-              <BusinessLogoField businessName={businessInput || client.business} />
               <div>
                 <label style={labelStyle}>Business / Organization Name</label>
                 <input
@@ -12541,7 +12581,7 @@ function MilestoneTrackingPage({
                           zIndex: 2 - i,
                         }}
                       >
-                        {dev.initials}
+                        <AvatarIcon kind="person" size={16} />
                       </div>
                     ))}
                   </div>
@@ -14810,7 +14850,7 @@ function EnterpriseAnalyticsPage({
                     color: "#fff",
                   }}
                 >
-                  {profile.initials}
+                  <MyAvatar kind="person" size={16} />
                 </div>
                 <span
                   style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}
@@ -16538,7 +16578,7 @@ export default function App() {
                         color: "#fff",
                       }}
                     >
-                      {profile.initials}
+                      <MyAvatar kind="person" size={16} />
                     </div>
                     <span
                       style={{
@@ -16848,7 +16888,7 @@ export default function App() {
                           color: profile.avatarColors[1],
                         }}
                       >
-                        {profile.initials}
+                        <MyAvatar kind="person" size={16} />
                       </div>
                       <span
                         style={{
