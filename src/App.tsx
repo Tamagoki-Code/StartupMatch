@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, lazy, Suspense } from "react";
 
 import {
   AreaChart,
@@ -4050,9 +4050,45 @@ const notifIcon = { warning: "⚠️", success: "✅", info: "💬" };
 
 // ─── Notification Bell (shared across every top bar) ─────────────────────────
 
+// Two lines when collapsed; "Show more" only appears if the text is actually cut off.
+function ClampedText({ text, expanded, read }: { text: string; expanded: boolean; read: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [clamped, setClamped] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && !expanded) setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [text, expanded]);
+
+  return (
+    <>
+      <span
+        ref={ref}
+        style={{
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: expanded ? "unset" : 2,
+          overflow: "hidden",
+          fontSize: 12.5,
+          lineHeight: 1.5,
+          color: read ? "#475569" : "#0F172A",
+          fontWeight: read ? 500 : 600,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {text}
+      </span>
+      {clamped && (
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#2563EB" }}>{expanded ? "Show less" : "Show more"}</span>
+      )}
+    </>
+  );
+}
+
 function NotificationBell() {
-  const { notifications, refresh, markOneRead, markAllRead } = useNotifications();
+  const { notifications, refresh, setRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const unread = notifications.filter((n) => !n.read).length;
 
@@ -4156,58 +4192,85 @@ function NotificationBell() {
             {notifications.length === 0 ? (
               <EmptyState message="No notifications yet." />
             ) : (
-              notifications.map((n, i) => (
-                <button
-                  key={n.id}
-                  onClick={() => markOneRead(n.id)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    gap: 10,
-                    textAlign: "left",
-                    padding: "12px 16px",
-                    border: "none",
-                    background: "#fff",
-                    cursor: "pointer",
-                    borderBottom: i < notifications.length - 1 ? "1px solid #F8FAFC" : "none",
-                    opacity: n.read ? 0.55 : 1,
-                    fontFamily: "Inter, sans-serif",
-                  }}
-                >
+              notifications.map((n, i) => {
+                const expanded = expandedId === n.id;
+                return (
                   <div
+                    key={n.id}
                     style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 8,
-                      flexShrink: 0,
-                      background: notifBg[n.type],
-                      border: `1px solid ${notifBorder[n.type]}`,
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 12,
+                      gap: 10,
+                      padding: "12px 14px 12px 16px",
+                      background: n.read ? "#fff" : "#F5F9FF",
+                      borderBottom: i < notifications.length - 1 ? "1px solid #F1F5F9" : "none",
                     }}
                   >
-                    {notifIcon[n.type]}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p
+                    <div
                       style={{
-                        margin: "0 0 3px",
-                        fontSize: 12.5,
-                        color: notifColor[n.type],
-                        lineHeight: 1.5,
-                        fontWeight: n.read ? 500 : 600,
+                        width: 26,
+                        height: 26,
+                        borderRadius: 8,
+                        flexShrink: 0,
+                        background: notifBg[n.type],
+                        border: `1px solid ${notifBorder[n.type]}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
                       }}
                     >
-                      {n.text}
-                    </p>
-                    <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>
-                      {n.time}
-                    </span>
+                      {notifIcon[n.type]}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <button
+                        onClick={() => {
+                          setExpandedId(expanded ? null : n.id);
+                          if (!n.read) setRead(n.id, true);
+                        }}
+                        aria-expanded={expanded}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          padding: 0,
+                          border: "none",
+                          background: "none",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          fontFamily: "Inter, sans-serif",
+                        }}
+                      >
+                        <ClampedText text={n.text} expanded={expanded} read={n.read} />
+                      </button>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>{n.time}</span>
+                        <span style={{ fontSize: 11, color: "#CBD5E1" }}>·</span>
+                        <button
+                          onClick={() => setRead(n.id, !n.read)}
+                          style={{
+                            padding: 0,
+                            border: "none",
+                            background: "none",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "#64748B",
+                            cursor: "pointer",
+                            fontFamily: "Inter, sans-serif",
+                          }}
+                        >
+                          {n.read ? "Mark as unread" : "Mark as read"}
+                        </button>
+                      </div>
+                    </div>
+                    {!n.read && (
+                      <span
+                        aria-label="Unread"
+                        title="Unread"
+                        style={{ width: 8, height: 8, borderRadius: "50%", background: "#2563EB", flexShrink: 0, marginTop: 6 }}
+                      />
+                    )}
                   </div>
-                </button>
-              ))
+                );
+              })
             )}
           </div>
         </>

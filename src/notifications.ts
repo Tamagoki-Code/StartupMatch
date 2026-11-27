@@ -12,8 +12,8 @@ import type { SprintNotifType } from "./contractTypes"
 // projectStore.ts versions of these only touch Supabase when a real contract
 // happens to be active (and don't return a Promise at all otherwise), which
 // doesn't fit the bell: notifications can exist before any contract does.
-export async function markNotificationSeen(id: string): Promise<void> {
-  const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id)
+export async function setNotificationRead(id: string, read: boolean): Promise<void> {
+  const { error } = await supabase.from("notifications").update({ read }).eq("id", id)
   if (error) throw error
 }
 
@@ -87,11 +87,11 @@ export function useNotifications() {
     refresh()
   }, [refresh])
 
-  const markOneRead = useCallback(
-    (id: string) => {
-      markNotificationSeen(id)
-        .then(refresh)
-        .catch(() => {})
+  // Optimistic: flip it on screen immediately, re-sync from the server if the write fails.
+  const setRead = useCallback(
+    (id: string, read: boolean) => {
+      setNotifications((list) => list.map((n) => (n.id === id ? { ...n, read } : n)))
+      setNotificationRead(id, read).catch(refresh)
     },
     [refresh],
   )
@@ -104,5 +104,5 @@ export function useNotifications() {
       .catch(() => {})
   }, [refresh])
 
-  return { notifications, loading, refresh, markOneRead, markAllRead }
+  return { notifications, loading, refresh, setRead, markAllRead }
 }

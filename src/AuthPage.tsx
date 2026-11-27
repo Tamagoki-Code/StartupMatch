@@ -314,14 +314,11 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
           backdropFilter: "blur(4px)",
         }}
       >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path
-            d="M3 14L7 6l3 5 3-7 2 3"
-            stroke="#fff"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+        {/* Same mark as public/favicon.svg: two overlapping circles, the match. */}
+        <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+          <path d="M13 6.66a7.5 7.5 0 010 12.68 7.5 7.5 0 010-12.68z" fill="#93C5FD" />
+          <circle cx="9" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
+          <circle cx="17" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
         </svg>
       </div>
       {!compact && (
