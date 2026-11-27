@@ -5,11 +5,11 @@
 const CLOUD_NAME = "dcheafa99"
 const UPLOAD_PRESET = "startup_match_docs"
 
-export async function uploadVerificationDocument(file: File): Promise<string> {
+export async function uploadVerificationDocument(file: File, folder = "verification_documents"): Promise<string> {
   const formData = new FormData()
   formData.append("file", file)
   formData.append("upload_preset", UPLOAD_PRESET)
-  formData.append("folder", "verification_documents")
+  formData.append("folder", folder)
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
     method: "POST",

@@ -113,6 +113,9 @@ import {
   searchMessageableProfiles,
 } from "./messages";
 import type { MessageableProfile } from "./messages";
+import { HelpButton, SupportTicketsPage } from "./SupportTickets";
+import { projectDuration, projectTimeline } from "./timeline";
+import { uploadVerificationDocument } from "./cloudinary";
 
 import * as contractsApi from "./contracts";
 
@@ -735,7 +738,7 @@ const adminNavItems = [
 
   { icon: IconLogs, label: "Audit Logs", id: "auditlogs" },
 
-  { icon: IconMessages, label: "Messages", id: "messages" },
+  { icon: IconMessages, label: "Support Tickets", id: "support" },
 
   { icon: IconSettings, label: "Settings", id: "settings" },
 ];
@@ -3435,9 +3438,53 @@ function DeveloperProfile({
 
 // ─── Developer Marketplace & Bids ─────────────────────────────────────────────
 
-function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
+function BusinessAvatar({ name, url, size = 44 }: { name: string; url?: string | null; size?: number }) {
+  const [broken, setBroken] = useState(false);
+  const box: React.CSSProperties = { width: size, height: size, borderRadius: 10, flexShrink: 0 };
+  if (url && !broken) {
+    return (
+      <img
+        src={url}
+        alt={`${name} logo`}
+        onError={() => setBroken(true)}
+        style={{ ...box, objectFit: "cover", border: "1px solid #E2E8F0", background: "#fff" }}
+      />
+    );
+  }
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const initials = ((words[0]?.[0] ?? "?") + (words[1]?.[0] ?? "")).toUpperCase();
+  const palette = ["#2563EB", "#0F766E", "#7C3AED", "#C2410C", "#BE185D", "#15803D"];
+  const color = palette[[...name].reduce((h, ch) => h + ch.charCodeAt(0), 0) % palette.length];
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        ...box,
+        background: color,
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: size * 0.36,
+        fontWeight: 800,
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function MarketplaceFeed({
+  isMobile,
+  onMessageOwner,
+}: {
+  isMobile: boolean;
+  onMessageOwner?: (enterpriseId: string) => Promise<void>;
+}) {
   const [placed, setPlaced] = useState<Record<string, boolean>>({});
   const [bidTarget, setBidTarget] = useState<{ id: string; title: string } | null>(null);
+  const [messaging, setMessaging] = useState<string | null>(null);
+  const [messageError, setMessageError] = useState<{ id: string; text: string } | null>(null);
 
   const authProfile = getCachedAuthProfile();
   const isRealAccount = !!authProfile;
@@ -3542,25 +3589,48 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
               gap: 12,
             }}
           >
-            <div>
-              <div
-                style={{
-                  fontSize: 15,
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <BusinessAvatar name={project.business} url={project.avatarUrl} />
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 15,
 
-                  fontWeight: 700,
+                    fontWeight: 700,
 
-                  color: "#0F172A",
+                    color: "#0F172A",
 
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {project.title}
-              </div>
-              <div style={{ fontSize: 12.5, color: "#64748B", marginTop: 3 }}>
-                <span style={{ fontWeight: 600, color: "#334155" }}>
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  {project.title}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#1E293B", marginTop: 2 }}>
                   {project.business}
-                </span>{" "}
-                · {project.barangay}
+                </div>
+                {project.barangay && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${project.barangay}, Tagum City, Davao del Norte`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open in Google Maps"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      marginTop: 3,
+                      fontSize: 12.5,
+                      color: "#2563EB",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <svg width={13} height={13} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path d="M10 18s6-5.3 6-10a6 6 0 10-12 0c0 4.7 6 10 6 10z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                      <circle cx="10" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.6" />
+                    </svg>
+                    {project.barangay}, Tagum City
+                  </a>
+                )}
               </div>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -3584,7 +3654,12 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
               {[
                 { label: "Budget", value: project.budget },
 
-                { label: "Deadline", value: project.deadline },
+                {
+                  label: "Timeline",
+                  value: projectTimeline(project.postedAt, project.deadline) ?? `Due ${project.deadline}`,
+                },
+
+                { label: "Duration", value: projectDuration(project.postedAt, project.deadline) ?? "—" },
 
                 { label: "Phases", value: String(project.phases) },
               ].map((stat) => (
@@ -3620,6 +3695,41 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
                 </div>
               ))}
             </div>
+            <div style={{ marginTop: "auto", display: "flex", gap: 8 }}>
+            {project.enterpriseId && onMessageOwner && (
+              <button
+                onClick={async () => {
+                  setMessaging(project.id);
+                  setMessageError(null);
+                  try {
+                    await onMessageOwner(project.enterpriseId!);
+                  } catch (e) {
+                    setMessageError({ id: project.id, text: e instanceof Error ? e.message : "Could not open the conversation" });
+                    setMessaging(null);
+                  }
+                }}
+                disabled={messaging === project.id}
+                aria-label={`Message the owner of ${project.business}`}
+                style={{
+                  flex: 1,
+                  height: 40,
+                  borderRadius: 8,
+                  cursor: messaging === project.id ? "default" : "pointer",
+                  background: "#fff",
+                  color: "#2563EB",
+                  border: "1.5px solid #BFDBFE",
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <IconMessages size={15} /> {messaging === project.id ? "Opening…" : "Message Owner"}
+              </button>
+            )}
             <button
               onClick={() => {
                 if (isRealAccount) {
@@ -3633,7 +3743,7 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
               }}
               disabled={placed[project.id]}
               style={{
-                marginTop: "auto",
+                flex: 1,
 
                 height: 40,
 
@@ -3672,6 +3782,10 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
                 </>
               )}
             </button>
+            </div>
+            {messageError?.id === project.id && (
+              <div role="alert" style={{ fontSize: 12, color: "#B91C1C" }}>{messageError.text}</div>
+            )}
           </Card>
         ))}
       </div>
@@ -8738,7 +8852,7 @@ function ProjectSpecForm({
 
         {/* User chip */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <NotificationBell />
+          <HelpButton /><NotificationBell />
           {!isMobile && (
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -10963,7 +11077,7 @@ function NewMessageModal({
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name…"
+            placeholder="Search your contacts…"
             style={{
               width: "100%",
               padding: "9px 12px",
@@ -10981,7 +11095,13 @@ function NewMessageModal({
           {loading ? (
             <EmptyState message="Searching…" />
           ) : results.length === 0 ? (
-            <EmptyState message="No one found." />
+            <EmptyState
+              message={
+                query.trim()
+                  ? "No contacts match that name."
+                  : "Your contacts appear here once you've exchanged bids. Students can also message a business from its marketplace listing."
+              }
+            />
           ) : (
             results.map((p) => (
               <button
@@ -11124,9 +11244,15 @@ function ContractActivityLog({ isMobile, onBack }: { isMobile: boolean; onBack: 
   );
 }
 
-function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
+function MessagesView({
+  isMobile = false,
+  initialConversationId = null,
+}: {
+  isMobile?: boolean;
+  initialConversationId?: string | null;
+}) {
   const { conversations, loading: conversationsLoading, refresh: refreshConversations } = useConversations();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(initialConversationId);
   // Mobile: list and thread are two views of the same panel, not a fixed
   // split — picking a conversation shows the thread; Back returns to the
   // list. Desktop keeps the always-visible side-by-side layout.
@@ -11209,7 +11335,7 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
               <EmptyState message="Loading…" />
             ) : conversations.length === 0 ? (
               <div style={{ padding: 24 }}>
-                <EmptyState message="No conversations yet. Start one with New Message." />
+                <EmptyState message="No conversations yet. Use Message Owner on a marketplace listing, or New Message to reach your contacts. For help from PSITS moderators, use the Help button." />
               </div>
             ) : (
               conversations.map((c) => (
@@ -11461,6 +11587,93 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
   );
 }
 
+// Shown on the business's marketplace listings; initials are used when unset.
+function BusinessLogoField({ businessName }: { businessName: string }) {
+  const me = getCachedAuthProfile();
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!me) return;
+    supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", me.id)
+      .single()
+      .then(({ data }) => setUrl((data?.avatar_url as string | null) ?? null));
+  }, [me?.id]);
+
+  async function save(next: string | null) {
+    if (!me) return;
+    const { error: dbError } = await supabase.from("profiles").update({ avatar_url: next }).eq("id", me.id);
+    if (dbError) throw dbError;
+    setUrl(next);
+  }
+
+  async function onPick(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    if (!file.type.startsWith("image/")) return setError("Please choose an image file (JPG or PNG).");
+    if (file.size > 5 * 1024 * 1024) return setError("Please choose an image under 5 MB.");
+    setBusy(true);
+    try {
+      await save(await uploadVerificationDocument(file, "business_logos"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not upload the logo — please retry.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  const linkButton: React.CSSProperties = {
+    padding: "6px 12px",
+    borderRadius: 8,
+    border: "1.5px solid #E2E8F0",
+    background: "#fff",
+    color: "#475569",
+    fontSize: 12.5,
+    fontWeight: 600,
+    cursor: busy ? "default" : "pointer",
+    fontFamily: "Inter, sans-serif",
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Business Logo</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <BusinessAvatar name={businessName || "Business"} url={url} size={52} />
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          aria-label="Upload business logo"
+          onChange={(e) => onPick(e.target.files?.[0])}
+          style={{ display: "none" }}
+        />
+        <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} style={linkButton}>
+          {busy ? "Uploading…" : url ? "Change Logo" : "Upload Logo"}
+        </button>
+        {url && !busy && (
+          <button
+            type="button"
+            onClick={() => save(null).catch(() => setError("Could not remove the logo — please retry."))}
+            style={{ ...linkButton, color: "#B91C1C" }}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 6 }}>
+        Shown on your project listings. Without a logo, your initials are used.
+      </div>
+      {error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C", marginTop: 4 }}>{error}</div>}
+    </div>
+  );
+}
+
 function SettingsView() {
   const client = useClientProfile();
   const dev = useDevProfile();
@@ -11552,6 +11765,7 @@ function SettingsView() {
           </div>
           {isEnterprise ? (
             <>
+              <BusinessLogoField businessName={businessInput || client.business} />
               <div>
                 <label style={labelStyle}>Business / Organization Name</label>
                 <input
@@ -12119,7 +12333,7 @@ function MilestoneTrackingPage({
                 {messages.length}
               </span>
             </button>
-            <NotificationBell />
+            <HelpButton /><NotificationBell />
             {onLogout && (
               <button
                 onClick={onLogout}
@@ -14538,7 +14752,7 @@ function EnterpriseAnalyticsPage({
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <NotificationBell />
+            <HelpButton /><NotificationBell />
             {onLogout && (
               <button
                 onClick={onLogout}
@@ -15570,6 +15784,9 @@ export default function App() {
 
   const [devNav, setDevNav] = useState("dashboard");
 
+  // Set by "Message Owner" on a listing so Messages opens on that conversation.
+  const [openConversationId, setOpenConversationId] = useState<string | null>(null);
+
   const [adminNav, setAdminNav] = useState("verification");
 
   const [sprintNav, setSprintNav] = useState("sprint");
@@ -16057,7 +16274,7 @@ export default function App() {
                     StartupMatch
                   </div>
                   <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-                    <NotificationBell />
+                    <HelpButton /><NotificationBell />
                     <button
                       onClick={handleLogout}
                       style={{
@@ -16099,7 +16316,7 @@ export default function App() {
                     padding: "12px 32px 0 32px",
                   }}
                 >
-                  <NotificationBell />
+                  <HelpButton /><NotificationBell />
                   <button
                     onClick={handleLogout}
                     style={{
@@ -16135,7 +16352,13 @@ export default function App() {
                   {devNav === "dashboard" ? (
                     <DeveloperProfile isMobile={isMobile} isOwnProfile={true} />
                   ) : devNav === "marketplace" && appRole !== "admin" ? (
-                    <MarketplaceFeed isMobile={isMobile} />
+                    <MarketplaceFeed
+                      isMobile={isMobile}
+                      onMessageOwner={async (enterpriseId) => {
+                        setOpenConversationId(await startConversationWith(enterpriseId));
+                        setDevNav("messages");
+                      }}
+                    />
                   ) : devNav === "bids" && appRole !== "admin" ? (
                     <BidsView />
                   ) : devNav === "resumecheck" && appRole !== "admin" ? (
@@ -16143,7 +16366,7 @@ export default function App() {
                       <ResumeCheckPage />
                     </Suspense>
                   ) : devNav === "messages" ? (
-                    <MessagesView isMobile={isMobile} />
+                    <MessagesView isMobile={isMobile} initialConversationId={openConversationId} />
                   ) : devNav === "settings" ? (
                     <SettingsView />
                   ) : (
@@ -16275,7 +16498,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <NotificationBell />
+                <HelpButton /><NotificationBell />
                 {!isMobile && (
                   <div
                     style={{
@@ -16369,8 +16592,8 @@ export default function App() {
             >
               {adminNav === "auditlogs" ? (
                 <AuditLogsPage />
-              ) : adminNav === "messages" ? (
-                <MessagesView isMobile={isMobile} />
+              ) : adminNav === "support" ? (
+                <SupportTicketsPage isMobile={isMobile} />
               ) : adminNav === "settings" ? (
                 <SettingsView />
               ) : (
@@ -16585,7 +16808,7 @@ export default function App() {
                         </span>
                       );
                     })()}
-                  <NotificationBell />
+                  <HelpButton /><NotificationBell />
                   {!isMobile && (
                     <div
                       style={{
