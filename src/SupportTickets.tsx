@@ -76,7 +76,7 @@ function StatusPill({ status }: { status: TicketStatus }) {
 
 function Note({ text, tone = "muted" }: { text: string; tone?: "muted" | "error" }) {
   return (
-    <div style={{ padding: 20, textAlign: "center", fontSize: 13, color: tone === "error" ? "#B91C1C" : "#94A3B8" }}>
+    <div style={{ padding: 20, textAlign: "center", fontSize: 13, color: tone === "error" ? "#B91C1C" : "#64748B" }}>
       {text}
     </div>
   )

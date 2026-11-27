@@ -555,98 +555,45 @@ function Card({
   );
 }
 
+// Countdown wording used everywhere: never a negative "days left".
+function daysLeftText(days: number): string {
+  if (days < 0) return `${Math.abs(days)}d overdue`;
+  if (days === 0) return "Due today";
+  return `${days}d left`;
+}
+
+type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
+
+// The design system's five status tones: every lifecycle status maps to one.
+const STATUS_TONE: Record<StatusTone, { bg: string; color: string; border: string; dot: string }> = {
+  success: { bg: "#F0FDF4", color: "#15803D", border: "#BBF7D0", dot: "#16A34A" },
+  warning: { bg: "#FFFBEB", color: "#B45309", border: "#FDE68A", dot: "#D97706" },
+  danger: { bg: "#FEF2F2", color: "#B91C1C", border: "#FECACA", dot: "#DC2626" },
+  info: { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE", dot: "#2563EB" },
+  neutral: { bg: "#F8FAFC", color: "#475569", border: "#E2E8F0", dot: "#94A3B8" },
+};
+
+const STATUS_TONE_OF: Record<string, StatusTone> = {
+  Verified: "success",
+  Active: "success",
+  Awarded: "success",
+  Approved: "success",
+  Completed: "success",
+  "Pending Review": "warning",
+  Pending: "warning",
+  "In Review": "warning",
+  Rejected: "danger",
+  Suspended: "danger",
+  Declined: "danger",
+  Disputed: "danger",
+  "Under Review": "info",
+  Open: "info",
+  Closed: "neutral",
+  Draft: "neutral",
+};
+
 function StatusPill({ status }: { status: string }) {
-  const cfg: Record<
-    string,
-    {
-      bg: string;
-      color: string;
-      border: string;
-      dot: string;
-    }
-  > = {
-    "Pending Review": {
-      bg: "#FFFBEB",
-
-      color: "#D97706",
-
-      border: "#FDE68A",
-
-      dot: "#D97706",
-    },
-
-    Verified: {
-      bg: "#F0FDF4",
-
-      color: "#16A34A",
-
-      border: "#BBF7D0",
-
-      dot: "#16A34A",
-    },
-
-    Rejected: {
-      bg: "#FEF2F2",
-
-      color: "#DC2626",
-
-      border: "#FECACA",
-
-      dot: "#DC2626",
-    },
-
-    "Under Review": {
-      bg: "#EFF6FF",
-
-      color: "#2563EB",
-
-      border: "#BFDBFE",
-
-      dot: "#2563EB",
-    },
-
-    Active: {
-      bg: "#F0FDF4",
-
-      color: "#16A34A",
-
-      border: "#BBF7D0",
-
-      dot: "#16A34A",
-    },
-
-    Suspended: {
-      bg: "#FEF2F2",
-
-      color: "#DC2626",
-
-      border: "#FECACA",
-
-      dot: "#DC2626",
-    },
-
-    Open: {
-      bg: "#EFF6FF",
-
-      color: "#2563EB",
-
-      border: "#BFDBFE",
-
-      dot: "#2563EB",
-    },
-
-    Closed: {
-      bg: "#F1F5F9",
-
-      color: "#64748B",
-
-      border: "#E2E8F0",
-
-      dot: "#94A3B8",
-    },
-  };
-
-  const c = cfg[status] ?? cfg["Pending Review"];
+  const c = STATUS_TONE[STATUS_TONE_OF[status] ?? "neutral"];
 
   return (
     <span
@@ -853,7 +800,7 @@ function AdminSidebar({
       </div>
 
       {/* Nav */}
-      <nav style={{ padding: "10px 0", flex: 1 }}>
+      <nav style={{ padding: "10px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
         {adminNavItems.map(({ icon: Icon, label, id }) => {
           const isActive = active === id;
 
@@ -870,7 +817,7 @@ function AdminSidebar({
 
                 gap: 11,
 
-                padding: collapsed ? "11px 0" : "11px 20px",
+                padding: collapsed ? "11px 0" : "11px 12px",
 
                 justifyContent: collapsed ? "center" : "flex-start",
 
@@ -879,10 +826,6 @@ function AdminSidebar({
                 background: isActive ? "#EFF6FF" : "transparent",
 
                 color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
 
                 cursor: "pointer",
 
@@ -893,6 +836,8 @@ function AdminSidebar({
                 fontWeight: isActive ? 600 : 500,
 
                 transition: "all 0.12s ease",
+
+                borderRadius: 8,
               }}
               onMouseEnter={(e) => {
                 if (!isActive)
@@ -990,11 +935,11 @@ function AuditLogsPage() {
       </div>
       <Card style={{ overflow: "hidden", padding: 0 }}>
         {loading ? (
-          <EmptyState message="Loading audit log…" />
+          <EmptyState variant="loading" message="Loading audit log…" />
         ) : error ? (
-          <EmptyState message={`Failed to load: ${error}`} />
+          <EmptyState variant="error" message={`Failed to load: ${error}`} />
         ) : rows.length === 0 ? (
-          <EmptyState message="No audit events yet. They'll show up here as verifications, awards, and milestone reviews happen." />
+          <EmptyState icon={<IconLogs size={20} />} message="No audit events yet. They'll show up here as verifications, awards, and milestone reviews happen." />
         ) : (
           <AuditTable rows={rows} />
         )}
@@ -1459,11 +1404,11 @@ function RealAccountsPanel({
     <Card style={{ overflow: "hidden", padding: 0 }}>
       {loading ? (
         <div style={{ padding: 24 }}>
-          <EmptyState message="Loading real accounts…" />
+          <EmptyState variant="loading" message="Loading real accounts…" />
         </div>
       ) : error ? (
         <div style={{ padding: 24 }}>
-          <EmptyState message={`Failed to load: ${error}`} />
+          <EmptyState variant="error" message={`Failed to load: ${error}`} />
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: 24 }}>
@@ -1803,33 +1748,71 @@ function SetNewPasswordScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
+function IconInbox({ size = 22 }: { size?: number }) {
   return (
-    <div style={{ padding: "48px 24px", textAlign: "center" }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 13l2.6-7.2A2 2 0 017.5 4.5h9a2 2 0 011.9 1.3L21 13" />
+      <path d="M3 13v5a2 2 0 002 2h14a2 2 0 002-2v-5h-5l-1.5 2.5h-5L7 13H3z" />
+    </svg>
+  );
+}
+
+// One component for the three "nothing to show yet" situations: still
+// loading (skeleton lines), failed (red, announced), or genuinely empty.
+function EmptyState({
+  message,
+  variant = "empty",
+  icon,
+}: {
+  message: string;
+  variant?: "empty" | "loading" | "error";
+  icon?: React.ReactNode;
+}) {
+  if (variant === "loading") {
+    return (
+      <div role="status" aria-busy="true" style={{ padding: "28px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {[92, 68, 80].map((w) => (
+          <div key={w} className="sm-skeleton" style={{ height: 12, width: `${w}%` }} />
+        ))}
+        <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{message}</span>
+      </div>
+    );
+  }
+  const isError = variant === "error";
+  return (
+    <div role={isError ? "alert" : undefined} style={{ padding: "44px 24px", textAlign: "center" }}>
       <div
         style={{
-          width: 56,
-
-          height: 56,
-
-          borderRadius: 14,
-
-          background: "#F1F5F9",
-
-          margin: "0 auto 14px",
-
+          width: 48,
+          height: 48,
+          borderRadius: "50%",
+          background: isError ? "#FEF2F2" : "#F1F5F9",
+          margin: "0 auto 12px",
           display: "flex",
-
           alignItems: "center",
-
           justifyContent: "center",
-
-          color: "#94A3B8",
+          color: isError ? "#DC2626" : "#64748B",
         }}
       >
-        <IconShield size={24} />
+        {isError ? (
+          <svg width={22} height={22} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8.7 3.4L1.9 15a1.5 1.5 0 001.3 2.2h13.6a1.5 1.5 0 001.3-2.2L11.3 3.4a1.5 1.5 0 00-2.6 0z" />
+            <path d="M10 8v3.4M10 14.2v.1" />
+          </svg>
+        ) : (
+          icon ?? <IconInbox />
+        )}
       </div>
-      <p style={{ margin: 0, fontSize: 14, color: "#94A3B8", fontWeight: 500 }}>
+      <p
+        style={{
+          margin: "0 auto",
+          maxWidth: 380,
+          fontSize: 13.5,
+          lineHeight: 1.55,
+          color: isError ? "#B91C1C" : "#64748B",
+          fontWeight: 500,
+        }}
+      >
         {message}
       </p>
     </div>
@@ -2329,25 +2312,6 @@ function DeveloperProfile({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div
-        style={{
-          fontSize: 12,
-
-          color: "#94A3B8",
-
-          display: "flex",
-
-          gap: 6,
-
-          alignItems: "center",
-        }}
-      >
-        <span style={{ color: "#2563EB", fontWeight: 500, cursor: "pointer" }}>
-          Dashboard
-        </span>
-        <span>›</span>
-        <span>Developer Profile</span>
-      </div>
 
       {/* Header card */}
       <Card style={{ padding: 24 }}>
@@ -2544,7 +2508,8 @@ function DeveloperProfile({
                 fontWeight: 500,
               }}
             >
-              {p.title} — {p.school}
+              {[p.title, p.school].filter(Boolean).join(" · ") ||
+                (isOwnProfile ? "Add your course and school in Settings so clients know who you are." : "")}
             </p>
             {p.academicId && (
               <p
@@ -2715,7 +2680,7 @@ function DeveloperProfile({
             Technical Proficiencies
           </h2>
           {p.skills.length === 0 && p.tools.length === 0 ? (
-            <EmptyState message="No skills added yet. Add your core skills and tools in Edit Portfolio." />
+            <EmptyState icon={<IconChart size={20} />} message="No skills added yet. Add your core skills and tools in Edit Portfolio." />
           ) : (
             <>
               <div
@@ -2781,7 +2746,7 @@ function DeveloperProfile({
             Links & Repositories
           </h2>
           {p.links.length === 0 ? (
-            <EmptyState message="No links added yet. Add your GitHub, LinkedIn, or portfolio in Edit Portfolio." />
+            <EmptyState icon={<IconExternal size={18} />} message="No links added yet. Add your GitHub, LinkedIn, or portfolio in Edit Portfolio." />
           ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {p.links.map((link) => (
@@ -2860,7 +2825,7 @@ function DeveloperProfile({
           </span>
         </div>
         {p.projects.length === 0 ? (
-          <EmptyState message="No completed projects yet. Bid on a project in the Marketplace to start building your track record." />
+          <EmptyState icon={<IconBids size={20} />} message="No completed projects yet. Bid on a project in the Marketplace to start building your track record." />
         ) : (
         <div style={{ overflowX: "auto" }}>
           <table
@@ -3106,7 +3071,7 @@ function DeveloperProfile({
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {reviewCount === 0 && (
-            <EmptyState message="No peer reviews yet. These come in once you complete projects for clients." />
+            <EmptyState icon={<IconStar size={20} />} message="No peer reviews yet. These come in once you complete projects for clients." />
           )}
           {p.reviews.map((r) => (
             <div
@@ -3412,7 +3377,7 @@ function MarketplaceFeed({
               background: "#2563EB",
             }}
           />
-          {projects.length} Open Projects
+          {projects.length} Open {projects.length === 1 ? "Project" : "Projects"}
         </span>
       </div>
 
@@ -3653,7 +3618,7 @@ function MarketplaceFeed({
   );
 }
 
-function BidsView() {
+function BidsView({ isMobile = false }: { isMobile?: boolean }) {
   const mockBids = useDevBids();
   const authProfile = getCachedAuthProfile();
   const isRealAccount = !!authProfile;
@@ -3684,7 +3649,37 @@ function BidsView() {
       </div>
       {bids.length === 0 ? (
         <Card>
-          <EmptyState message="You have not placed any bids yet. Browse the marketplace to get started." />
+          <EmptyState icon={<IconBids size={20} />} message="You have not placed any bids yet. Browse the marketplace to get started." />
+        </Card>
+      ) : isMobile ? (
+        // Phones: one card per bid so the amount and status are never off-screen.
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          {bids.map((bid, i) => (
+            <div
+              key={bid.id}
+              style={{
+                padding: "14px 16px",
+                borderBottom: i < bids.length - 1 ? "1px solid #F1F5F9" : "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", minWidth: 0, overflowWrap: "anywhere" }}>
+                  {bid.project}
+                </div>
+                <StatusPill status={bid.status} />
+              </div>
+              <div style={{ fontSize: 12.5, color: "#64748B" }}>{bid.client}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12.5 }}>
+                <span style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }} data-numeric>
+                  {bid.amount}
+                </span>
+                <span style={{ color: "#64748B" }}>Placed {bid.placedAt}</span>
+              </div>
+            </div>
+          ))}
         </Card>
       ) : (
         <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -3807,13 +3802,30 @@ const activityRoleLabel: Record<string, string> = {
   admin: "Platform Admin",
 };
 
-const notifColor = { warning: "#D97706", success: "#16A34A", info: "#2563EB" };
 
 const notifBg = { warning: "#FFFBEB", success: "#F0FDF4", info: "#EFF6FF" };
 
 const notifBorder = { warning: "#FDE68A", success: "#BBF7D0", info: "#BFDBFE" };
 
-const notifIcon = { warning: "⚠️", success: "✅", info: "💬" };
+// Drawn in the matching status colour; one stroke weight, no emoji.
+const notifIcon: Record<"warning" | "success" | "info", React.ReactNode> = {
+  warning: (
+    <svg width={14} height={14} viewBox="0 0 20 20" fill="none" stroke="#D97706" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8.7 3.4L1.9 15a1.5 1.5 0 001.3 2.2h13.6a1.5 1.5 0 001.3-2.2L11.3 3.4a1.5 1.5 0 00-2.6 0z" />
+      <path d="M10 8v3.4M10 14.2v.1" />
+    </svg>
+  ),
+  success: (
+    <svg width={14} height={14} viewBox="0 0 20 20" fill="none" stroke="#16A34A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 10.5l3.5 3.5 7.5-8" />
+    </svg>
+  ),
+  info: (
+    <svg width={14} height={14} viewBox="0 0 20 20" fill="none" stroke="#2563EB" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 9.5c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6-2.9 6-6.5 6c-.9 0-1.8-.2-2.6-.5L3.5 16l1-3.1c-.6-1-1-2.1-1-3.4z" />
+    </svg>
+  ),
+};
 
 // ─── Notification Bell (shared across every top bar) ─────────────────────────
 
@@ -3911,11 +3923,11 @@ function NotificationBell() {
           />
           <div
             style={{
-              position: "absolute",
-              top: "calc(100% + 8px)",
-              right: 0,
-              width: 320,
-              maxHeight: 400,
+              // Phones: span the screen under the top bar instead of hanging off the bell.
+              ...(window.innerWidth < 640
+                ? { position: "fixed" as const, top: 64, left: 12, right: 12 }
+                : { position: "absolute" as const, top: "calc(100% + 8px)", right: 0, width: 360 }),
+              maxHeight: window.innerWidth < 640 ? "calc(100dvh - 88px)" : 440,
               overflowY: "auto",
               background: "#fff",
               border: "1px solid #E2E8F0",
@@ -3957,7 +3969,7 @@ function NotificationBell() {
               )}
             </div>
             {notifications.length === 0 ? (
-              <EmptyState message="No notifications yet." />
+              <EmptyState icon={<IconBell size={18} />} message="No notifications yet." />
             ) : (
               notifications.map((n, i) => {
                 const expanded = expandedId === n.id;
@@ -4251,7 +4263,7 @@ function StudentSidebar({
         </div>
       )}
 
-      <nav style={{ padding: "8px 0", flex: 1 }}>
+      <nav style={{ padding: "8px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
         {visibleItems.map(({ icon: Icon, label, id }) => {
           const isActive = active === id;
 
@@ -4268,7 +4280,7 @@ function StudentSidebar({
 
                 gap: 12,
 
-                padding: collapsed ? "10px 0" : "10px 20px",
+                padding: collapsed ? "10px 0" : "10px 12px",
 
                 justifyContent: collapsed ? "center" : "flex-start",
 
@@ -4277,10 +4289,6 @@ function StudentSidebar({
                 background: isActive ? "#EFF6FF" : "transparent",
 
                 color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
 
                 cursor: "pointer",
 
@@ -4292,9 +4300,7 @@ function StudentSidebar({
 
                 transition: "all 0.12s ease",
 
-                borderRadius: collapsed ? 0 : "0 8px 8px 0",
-
-                marginRight: collapsed ? 0 : 12,
+                borderRadius: 8,
               }}
               onMouseEnter={(e) => {
                 if (!isActive)
@@ -4381,11 +4387,11 @@ function AdminSprintProgressView() {
       </div>
       <Card style={{ overflow: "hidden" }}>
         {loading ? (
-          <EmptyState message="Loading sprint progress…" />
+          <EmptyState variant="loading" message="Loading sprint progress…" />
         ) : error ? (
-          <EmptyState message={`Failed to load: ${error}`} />
+          <EmptyState variant="error" message={`Failed to load: ${error}`} />
         ) : rows.length === 0 ? (
-          <EmptyState message="No active contracts yet. They'll show up here once a bid is awarded." />
+          <EmptyState icon={<IconKanban size={20} />} message="No active contracts yet. They'll show up here once a bid is awarded." />
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -4609,12 +4615,12 @@ function SprintDashboard({
     atRisk: phases.filter((p) => p.status === "disputed").length,
   };
 
-  const dueLabel = (daysLeft: number, status: SprintPhaseStatus) => {
-    if (status === "completed") return "✅ Delivered";
+  const dueLabel = (daysLeft: number, status: SprintPhaseStatus, deadline: string) => {
+    if (status === "completed") return "Delivered";
 
-    if (daysLeft < 0) return `Overdue by ${Math.abs(daysLeft)}d`;
+    if (!deadline || deadline === "TBD") return "No deadline set";
 
-    return `Due in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`;
+    return daysLeftText(daysLeft);
   };
 
   const postComment = (number: number) => {
@@ -4772,7 +4778,9 @@ function SprintDashboard({
 
                   alignItems: "center",
 
-                  gap: 6,
+                  flexWrap: "wrap",
+
+                  gap: "2px 6px",
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -4788,12 +4796,14 @@ function SprintDashboard({
                     strokeLinecap="round"
                   />
                 </svg>
-                Client:{" "}
-                <span style={{ fontWeight: 600, color: "#334155" }}>
-                  {project.client}
+                <span style={{ whiteSpace: "nowrap" }}>
+                  Client:{" "}
+                  <span style={{ fontWeight: 600, color: "#334155" }}>
+                    {project.client}
+                  </span>
                 </span>
                 <span style={{ color: "#CBD5E1" }}>·</span>
-                <span>
+                <span style={{ whiteSpace: "nowrap" }}>
                   Due{" "}
                   <span
                     style={{
@@ -4867,12 +4877,12 @@ function SprintDashboard({
                     letterSpacing: "-0.03em",
                   }}
                 >
-                  {project.daysLeft}d
+                  {Math.abs(project.daysLeft)}d
                 </div>
                 <div
                   style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}
                 >
-                  Days Left
+                  {project.daysLeft < 0 ? "Overdue" : "Days Left"}
                 </div>
               </div>
             </div>
@@ -5192,7 +5202,7 @@ function SprintDashboard({
                               borderRadius: 99,
                             }}
                           >
-                            Due in {phase.dev.daysLeft}d
+                            {daysLeftText(phase.dev.daysLeft)}
                           </span>
                         )}
                         {isRevision && (
@@ -5418,7 +5428,7 @@ function SprintDashboard({
                                     : "#0F172A",
                               }}
                             >
-                              {dueLabel(phase.dev.daysLeft, phase.status)}
+                              {dueLabel(phase.dev.daysLeft, phase.status, phase.dev.deadline)}
                             </div>
                           </div>
                         </div>
@@ -6731,36 +6741,35 @@ function SprintDashboard({
                 fontWeight: 700,
 
                 color: "#0F172A",
+
+                whiteSpace: "nowrap",
               }}
             >
               Reminder Alerts
             </h3>
-            <span
-              style={{
-                marginLeft: "auto",
-
-                background: unreadNotifs.length ? "#FEF2F2" : "#F8FAFC",
-
-                border: `1px solid ${
-                  unreadNotifs.length ? "#FECACA" : "#E2E8F0"
-                }`,
-
-                color: unreadNotifs.length ? "#DC2626" : "#94A3B8",
-
-                fontSize: 10.5,
-
-                fontWeight: 700,
-
-                padding: "2px 7px",
-
-                borderRadius: 99,
-              }}
-            >
-              {unreadNotifs.length} new
-            </span>
+            {unreadNotifs.length > 0 && (
+              <span
+                style={{
+                  background: "#EFF6FF",
+                  border: "1px solid #BFDBFE",
+                  color: "#1D4ED8",
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  padding: "2px 7px",
+                  borderRadius: 99,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {unreadNotifs.length} new
+              </span>
+            )}
             <button
               onClick={markAllNotificationsRead}
               style={{
+                marginLeft: "auto",
+
+                whiteSpace: "nowrap",
+
                 background: "none",
 
                 border: "none",
@@ -6785,8 +6794,6 @@ function SprintDashboard({
           </div>
           <div style={{ maxHeight: 340, overflowY: "auto" }}>
             {project.notifications.map((n, i) => {
-              const color = notifColor[n.type];
-
               const bg = notifBg[n.type];
 
               const border = notifBorder[n.type];
@@ -6819,9 +6826,6 @@ function SprintDashboard({
                         ? "1px solid #F8FAFC"
                         : "none",
 
-                    opacity: n.read ? 0.55 : 1,
-
-                    transition: "opacity 0.15s",
 
                     fontFamily: "Inter, sans-serif",
                   }}
@@ -6864,7 +6868,7 @@ function SprintDashboard({
 
                         fontSize: 12.5,
 
-                        color: color,
+                        color: n.read ? "#475569" : "#0F172A",
 
                         lineHeight: 1.5,
 
@@ -7071,7 +7075,7 @@ function SprintDashboard({
             </span>
           </div>
           {activityFeed.length === 0 ? (
-            <EmptyState message="No activity yet. Comments and milestone updates will show up here." />
+            <EmptyState icon={<IconLogs size={20} />} message="No activity yet. Comments and milestone updates will show up here." />
           ) : (
             <div style={{ padding: "6px 0" }}>
               {activityFeed.map((a) => (
@@ -7292,7 +7296,7 @@ function SprintOverview({
 
       value: `${completed}/${project.totalPhases}`,
 
-      color: "#16A34A",
+      color: "#0F172A",
 
       bg: "#F0FDF4",
 
@@ -7304,7 +7308,8 @@ function SprintOverview({
 
       value: String(inReview),
 
-      color: "#2563EB",
+      // Only colored when it asks for attention.
+      color: inReview > 0 ? "#B45309" : "#0F172A",
 
       bg: "#EFF6FF",
 
@@ -7314,9 +7319,9 @@ function SprintOverview({
     {
       label: "Next Deadline",
 
-      value: nextPhase ? `${nextPhase.dev.daysLeft}d` : "—",
+      value: nextPhase && nextPhase.dev.deadline !== "TBD" ? daysLeftText(nextPhase.dev.daysLeft) : "—",
 
-      color: "#D97706",
+      color: nextPhase && nextPhase.dev.deadline !== "TBD" && nextPhase.dev.daysLeft < 0 ? "#B91C1C" : "#0F172A",
 
       bg: "#FFFBEB",
 
@@ -7328,11 +7333,11 @@ function SprintOverview({
 
       value: formatPeso(project.paidToDate),
 
-      color: "#7C3AED",
+      color: "#0F172A",
 
-      bg: "#F5F3FF",
+      bg: "#F0FDF4",
 
-      border: "#DDD6FE",
+      border: "#BBF7D0",
     },
   ];
 
@@ -7697,7 +7702,7 @@ function SprintOverview({
 
                       fontSize: 12.5,
 
-                      color: notifColor[n.type],
+                      color: "#0F172A",
 
                       lineHeight: 1.5,
                     }}
@@ -7768,6 +7773,7 @@ function SprintOverview({
             >
               Sprint Milestones <IconChevron size={13} dir="right" />
             </button>
+            {!getCachedAuthProfile() && (
             <button
               onClick={resetDemo}
               style={{
@@ -7800,6 +7806,7 @@ function SprintOverview({
             >
               Reset demo data <IconChevron size={13} dir="right" />
             </button>
+            )}
           </div>
           <div
             style={{
@@ -10487,7 +10494,7 @@ function ClientSidebar({
         </div>
       )}
 
-      <nav style={{ padding: "8px 0", flex: 1 }}>
+      <nav style={{ padding: "8px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
         {visibleItems.map(({ icon: Icon, label, id }) => {
           const isActive = active === id;
 
@@ -10504,7 +10511,7 @@ function ClientSidebar({
 
                 gap: 11,
 
-                padding: collapsed ? "10px 0" : "10px 18px",
+                padding: collapsed ? "10px 0" : "10px 12px",
 
                 justifyContent: collapsed ? "center" : "flex-start",
 
@@ -10513,10 +10520,6 @@ function ClientSidebar({
                 background: isActive ? "#EFF6FF" : "transparent",
 
                 color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
 
                 cursor: "pointer",
 
@@ -10528,9 +10531,7 @@ function ClientSidebar({
 
                 transition: "all 0.12s",
 
-                borderRadius: collapsed ? 0 : "0 8px 8px 0",
-
-                marginRight: collapsed ? 0 : 10,
+                borderRadius: 8,
               }}
               onMouseEnter={(e) => {
                 if (!isActive)
@@ -10773,7 +10774,7 @@ function ClientOverview({ isMobile, onNavigate }: { isMobile: boolean; onNavigat
             <Card style={{ padding: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Active Contract</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{project.project}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{project.client} · Due {project.deadline} ({project.daysLeft}d left)</div>
+              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{project.client} · Due {project.deadline} ({daysLeftText(project.daysLeft)})</div>
               <span style={{ display: "inline-flex", marginTop: 10, padding: "3px 10px", borderRadius: 99, background: "#EFF6FF", border: "1px solid #BFDBFE", color: "#2563EB", fontSize: 11, fontWeight: 700 }}>{project.contractType}</span>
             </Card>
             <Card style={{ padding: 20 }}>
@@ -10807,7 +10808,7 @@ function ClientOverview({ isMobile, onNavigate }: { isMobile: boolean; onNavigat
         </>
       ) : (
         <Card style={{ padding: 0 }}>
-          <EmptyState message="No active contract yet. Award a bid on one of your postings to start tracking it here." />
+          <EmptyState icon={<IconKanban size={20} />} message="No active contract yet. Award a bid on one of your postings to start tracking it here." />
         </Card>
       )}
     </div>
@@ -10859,7 +10860,7 @@ function ProjectContractsView({ onPostProject, isMobile }: { onPostProject: () =
       {isReal && <BidsReceivedPanel />}
       <Card style={{ overflow: "hidden" }}>
         {contracts.length === 0 ? (
-          <EmptyState message="No projects yet. Post a project to see it here." />
+          <EmptyState icon={<IconMarket size={20} />} message="No projects yet. Post a project to see it here." />
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -10971,7 +10972,7 @@ function NewMessageModal({
         </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
           {loading ? (
-            <EmptyState message="Searching…" />
+            <EmptyState variant="loading" message="Searching…" />
           ) : results.length === 0 ? (
             <EmptyState
               message={
@@ -11113,7 +11114,7 @@ function ContractActivityLog({ isMobile, onBack }: { isMobile: boolean; onBack: 
       </div>
       <Card style={{ overflow: "hidden", padding: 0 }}>
         {rows.length === 0 ? (
-          <EmptyState message="No activity yet. Submissions, comments, and milestone decisions will show up here." />
+          <EmptyState icon={<IconLogs size={20} />} message="No activity yet. Submissions, comments, and milestone decisions will show up here." />
         ) : (
           <AuditTable rows={rows} />
         )}
@@ -11205,15 +11206,15 @@ function MessagesView({
         </button>
       </div>
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", height: 520 }}>
+        <div style={{ display: "flex", height: isMobile ? "max(420px, calc(100dvh - 190px))" : 560 }}>
           {/* Conversation list */}
           {showList && (
           <div style={{ width: isMobile ? "100%" : 260, flexShrink: 0, borderRight: isMobile ? "none" : "1px solid #F1F5F9", overflowY: "auto" }}>
             {conversationsLoading ? (
-              <EmptyState message="Loading…" />
+              <EmptyState variant="loading" message="Loading…" />
             ) : conversations.length === 0 ? (
               <div style={{ padding: 24 }}>
-                <EmptyState message="No conversations yet. Use Message Owner on a marketplace listing, or New Message to reach your contacts. For help from PSITS moderators, use the Help button." />
+                <EmptyState icon={<IconMessages size={20} />} message="No conversations yet. Use Message Owner on a marketplace listing, or New Message to reach your contacts. For help from PSITS moderators, use the Help button." />
               </div>
             ) : (
               conversations.map((c) => (
@@ -11235,7 +11236,6 @@ function MessagesView({
                   }}
                 >
                   <div
-                    title={isMobile ? c.otherName : undefined}
                     style={{
                       width: 34,
                       height: 34,
@@ -11261,10 +11261,9 @@ function MessagesView({
                         gap: 6,
                       }}
                     >
-                      {!isMobile && (
                       <span
                         style={{
-                          fontSize: 13,
+                          fontSize: isMobile ? 14 : 13,
                           fontWeight: c.unreadCount > 0 ? 700 : 600,
                           color: "#0F172A",
                           overflow: "hidden",
@@ -11274,7 +11273,6 @@ function MessagesView({
                       >
                         {c.otherName}
                       </span>
-                      )}
                       {c.unreadCount > 0 && (
                         <span
                           style={{
@@ -11314,7 +11312,7 @@ function MessagesView({
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
             {!active ? (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <EmptyState message="Select a conversation, or start a new one." />
+                <EmptyState icon={<IconMessages size={20} />} message="Select a conversation, or start a new one." />
               </div>
             ) : (
               <>
@@ -11360,9 +11358,9 @@ function MessagesView({
                 </div>
                 <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
                   {messagesLoading ? (
-                    <EmptyState message="Loading…" />
+                    <EmptyState variant="loading" message="Loading…" />
                   ) : messages.length === 0 ? (
-                    <EmptyState message="No messages yet. Say hello." />
+                    <EmptyState icon={<IconMessages size={20} />} message="No messages yet. Say hello." />
                   ) : (
                     messages.map((m) => (
                       <div
@@ -13038,9 +13036,7 @@ function MilestoneTrackingPage({
                     style={{
                       background: "#fff",
 
-                      border: "1px solid #E2E8F0",
-
-                      borderLeft: `4px solid ${cfg.border}`,
+                      border: `1px solid ${cfg.border}`,
 
                       borderRadius: 12,
 
@@ -15603,11 +15599,11 @@ function EnterpriseAnalyticsPage({
               </button>
             </div>
             {auditLoading ? (
-              <EmptyState message="Loading audit log…" />
+              <EmptyState variant="loading" message="Loading audit log…" />
             ) : auditError ? (
-              <EmptyState message={`Failed to load: ${auditError}`} />
+              <EmptyState variant="error" message={`Failed to load: ${auditError}`} />
             ) : auditLog.length === 0 ? (
-              <EmptyState message="No audit events yet. They'll show up here as verifications, awards, and milestone reviews happen." />
+              <EmptyState icon={<IconLogs size={20} />} message="No audit events yet. They'll show up here as verifications, awards, and milestone reviews happen." />
             ) : (
               <AuditTable rows={auditLog.slice(0, 5)} />
             )}
@@ -15797,6 +15793,165 @@ function PendingVerification({
         </div>
       </Card>
     </div>
+  );
+}
+
+// ─── Shared top bar (student pages) ──────────────────────────────────────────
+// Same bar on every student page: the page's name, then help, notifications,
+// the signed-in user (a shortcut to their profile) and logout.
+function AppTopBar({
+  title,
+  isMobile,
+  onMenu,
+  onProfile,
+  onLogout,
+  extra,
+}: {
+  title: string;
+  isMobile: boolean;
+  onMenu: () => void;
+  onProfile: () => void;
+  onLogout: () => void;
+  extra?: React.ReactNode;
+}) {
+  const profile = useDevProfile();
+  const name = getCachedAuthProfile()?.name || profile.name;
+
+  return (
+    <header
+      style={{
+        background: "#fff",
+        borderBottom: "1px solid #E2E8F0",
+        padding: isMobile ? "10px 16px" : "12px 32px",
+        minHeight: 60,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        position: "sticky",
+        top: 0,
+        zIndex: 30,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        {isMobile && (
+          <button
+            onClick={onMenu}
+            aria-label="Open menu"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#475569", lineHeight: 0, padding: 6, borderRadius: 8 }}
+          >
+            <IconMenu size={20} />
+          </button>
+        )}
+        <div
+          style={{
+            margin: 0,
+            fontSize: 16,
+            fontWeight: 700,
+            color: "#0F172A",
+            letterSpacing: "-0.01em",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {title}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        {extra}
+        <HelpButton />
+        <NotificationBell />
+        {!isMobile && (
+          <button
+            onClick={onProfile}
+            title="View your profile"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "4px 12px 4px 4px",
+              border: "1px solid #E2E8F0",
+              borderRadius: 99,
+              background: "#fff",
+              cursor: "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+          >
+            <span
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[1]})`,
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                flexShrink: 0,
+              }}
+            >
+              <MyAvatar kind="person" size={16} />
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {name}
+            </span>
+          </button>
+        )}
+        <button
+          onClick={onLogout}
+          style={{
+            padding: "7px 12px",
+            borderRadius: 8,
+            border: "1px solid #E2E8F0",
+            background: "#fff",
+            color: "#475569",
+            fontSize: 12.5,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "Inter, sans-serif",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+        >
+          Log out
+        </button>
+      </div>
+    </header>
+  );
+}
+
+// Overdue only when the date has actually passed; otherwise a neutral reminder.
+function DeadlineChip({ label, date }: { label: string; date: string }) {
+  const due = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdue = !Number.isNaN(due.getTime()) && due < today;
+  const c = overdue
+    ? { bg: "#FEF2F2", border: "#FECACA", fg: "#DC2626" }
+    : { bg: "#F8FAFC", border: "#E2E8F0", fg: "#475569" };
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "5px 12px",
+        borderRadius: 99,
+        background: c.bg,
+        border: `1px solid ${c.border}`,
+        color: c.fg,
+        fontSize: 12,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.fg }} />
+      {overdue ? `${label} overdue · ${date.split(",")[0]}` : `${label} due ${date.split(",")[0]}`}
+    </span>
   );
 }
 
@@ -16257,127 +16412,28 @@ export default function App() {
               </div>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
-              {isMobile && (
-                <div
-                  style={{
-                    background: "#fff",
-
-                    borderBottom: "1px solid #E2E8F0",
-
-                    padding: "12px 20px",
-
-                    display: "flex",
-
-                    alignItems: "center",
-
-                    gap: 12,
-
-                    position: "sticky",
-
-                    top: 0,
-
-                    zIndex: 30,
-                  }}
-                >
-                  <button
-                    onClick={() => setSidebarOpen(true)}
-                    style={{
-                      background: "none",
-
-                      border: "none",
-
-                      cursor: "pointer",
-
-                      color: "#475569",
-
-                      padding: 4,
-
-                      lineHeight: 0,
-                    }}
-                  >
-                    <IconMenu size={20} />
-                  </button>
-                  <div
-                    style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}
-                  >
-                    StartupMatch
-                  </div>
-                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-                    <HelpButton /><NotificationBell />
-                    <button
-                      onClick={handleLogout}
-                      style={{
-                        padding: "6px 12px",
-
-                        borderRadius: 6,
-
-                        border: "1px solid #E2E8F0",
-
-                        background: "#fff",
-
-                        color: "#64748B",
-
-                        fontSize: 12,
-
-                        fontWeight: 600,
-
-                        cursor: "pointer",
-
-                        fontFamily: "Inter, sans-serif",
-                      }}
-                    >
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              )}
-              {!isMobile && (
-                <div
-                  style={{
-                    display: "flex",
-
-                    alignItems: "center",
-
-                    justifyContent: "flex-end",
-
-                    gap: 8,
-
-                    padding: "12px 32px 0 32px",
-                  }}
-                >
-                  <HelpButton /><NotificationBell />
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      padding: "6px 12px",
-
-                      borderRadius: 6,
-
-                      border: "1px solid #E2E8F0",
-
-                      background: "#fff",
-
-                      color: "#64748B",
-
-                      fontSize: 12,
-
-                      fontWeight: 600,
-
-                      cursor: "pointer",
-
-                      fontFamily: "Inter, sans-serif",
-                    }}
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
+              <AppTopBar
+                title={
+                  ({
+                    dashboard: "Developer Profile",
+                    marketplace: "Marketplace",
+                    bids: "Bids",
+                    resumecheck: "Resume Check",
+                    messages: "Messages",
+                    settings: "Settings",
+                  } as Record<string, string>)[devNav] ?? "Developer Profile"
+                }
+                isMobile={isMobile}
+                onMenu={() => setSidebarOpen(true)}
+                onProfile={() => setDevNav("dashboard")}
+                onLogout={handleLogout}
+              />
               <main
                 style={{
                   padding: isMobile ? "20px 16px 80px" : "32px 32px 80px",
                 }}
               >
-                <div style={{ maxWidth: 900, margin: "0 auto" }}>
+                <div key={devNav} className="sm-page" style={{ maxWidth: 960, margin: "0 auto" }}>
                   {devNav === "dashboard" ? (
                     <DeveloperProfile isMobile={isMobile} isOwnProfile={true} />
                   ) : devNav === "marketplace" && appRole !== "admin" ? (
@@ -16389,7 +16445,7 @@ export default function App() {
                       }}
                     />
                   ) : devNav === "bids" && appRole !== "admin" ? (
-                    <BidsView />
+                    <BidsView isMobile={isMobile} />
                   ) : devNav === "resumecheck" && appRole !== "admin" ? (
                     <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Loading Resume Check…</div>}>
                       <ResumeCheckPage />
@@ -16711,214 +16767,28 @@ export default function App() {
                 flexDirection: "column",
               }}
             >
-              {/* Sprint top bar */}
-              <div
-                style={{
-                  background: "#fff",
-
-                  borderBottom: "1px solid #E2E8F0",
-
-                  padding: isMobile ? "12px 16px" : "13px 32px",
-
-                  display: "flex",
-
-                  alignItems: "center",
-
-                  justifyContent: "space-between",
-
-                  position: "sticky",
-
-                  top: 0,
-
-                  zIndex: 30,
+              <AppTopBar
+                title={sprintNav === "dashboard" ? "Sprint Overview" : sprintNav === "sprint" ? "Sprint Board" : "Sprint Dashboard"}
+                isMobile={isMobile}
+                onMenu={() => setSidebarOpen(true)}
+                onProfile={() => {
+                  setPage("developer");
+                  setDevNav("dashboard");
                 }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {isMobile && (
-                    <button
-                      onClick={() => setSidebarOpen(true)}
-                      style={{
-                        background: "none",
-
-                        border: "none",
-
-                        cursor: "pointer",
-
-                        color: "#94A3B8",
-
-                        lineHeight: 0,
-
-                        padding: 4,
-                      }}
-                    >
-                      <IconMenu size={20} />
-                    </button>
-                  )}
-                  <div>
-                    {!isMobile && (
-                      <div
-                        style={{
-                          fontSize: 11,
-
-                          color: "#94A3B8",
-
-                          fontWeight: 600,
-
-                          textTransform: "uppercase",
-
-                          letterSpacing: "0.05em",
-                        }}
-                      >
-                        {appRole === "admin" ? "Regional Admin Dashboard" : "Student Developer Module"}
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        fontSize: 15,
-
-                        fontWeight: 700,
-
-                        color: "#0F172A",
-                      }}
-                    >
-                      Sprint Dashboard
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {/* Deadline chip — hidden for a real user with no real
-                      contract loaded, instead of showing the demo deadline. */}
-                  {!isMobile &&
-                    (!getCachedAuthProfile() || isUsingRealContract()) &&
-                    (() => {
-                      const due = project.phases.find(
-                        (p) =>
-                          p.status === "active" || p.status === "in_review",
-                      );
-
-                      return (
-                        <span
-                          style={{
-                            display: "inline-flex",
-
-                            alignItems: "center",
-
-                            gap: 5,
-
-                            padding: "5px 12px",
-
-                            borderRadius: 99,
-
-                            background: "#FEF2F2",
-
-                            border: "1px solid #FECACA",
-
-                            color: "#DC2626",
-
-                            fontSize: 12,
-
-                            fontWeight: 700,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 6,
-
-                              height: 6,
-
-                              borderRadius: "50%",
-
-                              background: "#DC2626",
-                            }}
-                          />
-                          {due
-                            ? `Sprint ${due.number} due ${due.dev.deadline.split(",")[0]}`
-                            : `Due ${project.deadline}`}
-                        </span>
-                      );
-                    })()}
-                  <HelpButton /><NotificationBell />
-                  {!isMobile && (
-                    <div
-                      style={{
-                        display: "flex",
-
-                        alignItems: "center",
-
-                        gap: 8,
-
-                        padding: "5px 12px 5px 5px",
-
-                        border: "1px solid #E2E8F0",
-
-                        borderRadius: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 28,
-
-                          height: 28,
-
-                          borderRadius: "50%",
-
-                          background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[0]})`,
-
-                          display: "flex",
-
-                          alignItems: "center",
-
-                          justifyContent: "center",
-
-                          fontSize: 11,
-
-                          fontWeight: 700,
-
-                          color: profile.avatarColors[1],
-                        }}
-                      >
-                        <MyAvatar kind="person" size={16} />
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 13,
-
-                          fontWeight: 600,
-
-                          color: "#334155",
-                        }}
-                      >
-                        {profile.name}
-                      </span>
-                    </div>
-                  )}
-                  {/* Logout — always accessible post-login (best practice) */}
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      padding: "6px 12px",
-
-                      borderRadius: 6,
-
-                      border: "1px solid #E2E8F0",
-
-                      background: "#fff",
-
-                      color: "#64748B",
-
-                      fontSize: 12,
-
-                      fontWeight: 600,
-
-                      cursor: "pointer",
-
-                      fontFamily: "Inter, sans-serif",
-                    }}
-                  >
-                    Logout
-                  </button>
-                </div>
-              </div>
+                onLogout={handleLogout}
+                extra={
+                  !isMobile && (!getCachedAuthProfile() || isUsingRealContract())
+                    ? (() => {
+                        const due = project.phases.find((p) => p.status === "active" || p.status === "in_review");
+                        return due && due.dev.deadline && due.dev.deadline !== "TBD" ? (
+                          <DeadlineChip label={`Sprint ${due.number}`} date={due.dev.deadline} />
+                        ) : project.deadline ? (
+                          <DeadlineChip label="Project" date={project.deadline} />
+                        ) : null;
+                      })()
+                    : null
+                }
+              />
 
               <main
                 style={{
@@ -16929,6 +16799,7 @@ export default function App() {
                   overflowY: "auto",
                 }}
               >
+                <div key={sprintNav} className="sm-page">
                 {sprintNav === "dashboard" ? (
                   <SprintOverview
                     isMobile={isMobile}
@@ -16938,12 +16809,13 @@ export default function App() {
                 ) : sprintNav === "sprint" ? (
                   <SprintDashboard isMobile={isMobile} isTablet={isTablet} appRole={appRole} />
                 ) : sprintNav === "bids" ? (
-                  <BidsView />
+                  <BidsView isMobile={isMobile} />
                 ) : sprintNav === "messages" ? (
                   <MessagesView isMobile={isMobile} />
                 ) : (
                   <SettingsView />
                 )}
+                </div>
               </main>
             </div>
           </div>

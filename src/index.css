@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 
 @theme inline {
@@ -35,21 +35,127 @@ body {
   background-color: #F8FAFC;
   color: #334155;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Inter's straight-sided 1 and open digits read better in dense tables. */
+  font-feature-settings: "cv05", "cv08";
+  caret-color: #2563EB;
 }
 
+::selection {
+  background: #BFDBFE;
+  color: #0F172A;
+}
+
+/* Money, dates, counts and IDs line up column to column. */
+table,
+input,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+/* One visible, on-brand focus ring for keyboard users; mouse clicks stay clean. */
+:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
+button,
+a,
+select,
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled) {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    box-shadow 0.15s ease, transform 0.1s ease;
+}
+button:not(:disabled):active {
+  transform: translateY(0.5px);
+}
+button:disabled {
+  cursor: default;
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94A3B8;
+  opacity: 1;
+}
+
+/* Page switches settle in instead of snapping: one short fade, no choreography. */
+@keyframes sm-page-in {
+  from {
+    opacity: 0.85;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sm-page {
+  animation: sm-page-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sm-shimmer {
+  0% {
+    background-position: -320px 0;
+  }
+  100% {
+    background-position: 320px 0;
+  }
+}
+.sm-skeleton {
+  background: linear-gradient(90deg, #F1F5F9 0px, #E2E8F0 120px, #F1F5F9 240px) #F1F5F9;
+  background-size: 640px 100%;
+  animation: sm-shimmer 1.2s linear infinite;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Thin scrollbars that stay out of the way until needed. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #CBD5E1;
-  border-radius: 3px;
-  opacity: 0;
-  transition: opacity 0.2s;
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
-*:hover::-webkit-scrollbar-thumb {
-  opacity: 1;
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+  background-clip: content-box;
 }
