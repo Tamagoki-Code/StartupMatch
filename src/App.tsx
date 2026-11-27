@@ -2507,6 +2507,8 @@ function DeveloperProfile({
   const p = useDevProfile();
   const [editOpen, setEditOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<DevProject | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const canEditPhoto = isOwnProfile && !!getCachedAuthProfile();
 
   const verified = p.verificationStatus === "Verified";
 
@@ -2561,8 +2563,16 @@ function DeveloperProfile({
           }}
         >
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <div
+            <button
+              type="button"
+              onClick={canEditPhoto ? () => setPhotoOpen(true) : undefined}
+              disabled={!canEditPhoto}
+              aria-label="View or change profile photo"
+              title={canEditPhoto ? "View or change profile photo" : undefined}
               style={{
+                padding: 0,
+                cursor: canEditPhoto ? "pointer" : "default",
+                font: "inherit",
                 width: 96,
 
                 height: 96,
@@ -2589,7 +2599,10 @@ function DeveloperProfile({
               }}
             >
               {isOwnProfile ? <MyAvatar kind="person" size={52} /> : <AvatarIcon kind="person" size={52} />}
-            </div>
+            </button>
+            {photoOpen && (
+              <ProfilePhotoViewer name={p.name} isBusiness={false} isMobile={isMobile} onClose={() => setPhotoOpen(false)} />
+            )}
             <div
               style={{
                 position: "absolute",
@@ -11623,9 +11636,10 @@ function MessagesView({
   );
 }
 
-// Profile photo for any role (business logo for enterprises), shared via
-// avatar.ts so every avatar updates right away. An icon is shown until set.
-function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
+// Upload / remove the signed-in user's photo (business logo for enterprises).
+// Shared by the Settings field and the profile photo viewer; avatar.ts makes
+// every avatar on screen update as soon as it changes.
+function useProfilePhotoActions(isBusiness: boolean) {
   const url = useMyAvatarUrl();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -11648,6 +11662,34 @@ function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
     }
   }
 
+  const fileInput = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*"
+      aria-label={`Upload ${isBusiness ? "business logo" : "profile photo"}`}
+      onChange={(e) => onPick(e.target.files?.[0])}
+      style={{ display: "none" }}
+    />
+  );
+
+  return {
+    url,
+    busy,
+    error,
+    fileInput,
+    choose: () => inputRef.current?.click(),
+    remove: () => {
+      setError(null);
+      setMyAvatarUrl(null).catch(() => setError(`Could not remove the ${noun} — please retry.`));
+    },
+    uploadLabel: `${url ? "Change" : "Upload"} ${isBusiness ? "Logo" : "Photo"}`,
+  };
+}
+
+function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
+  const photo = useProfilePhotoActions(isBusiness);
+
   const linkButton: React.CSSProperties = {
     padding: "6px 12px",
     borderRadius: 8,
@@ -11656,7 +11698,7 @@ function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
     color: "#475569",
     fontSize: 12.5,
     fontWeight: 600,
-    cursor: busy ? "default" : "pointer",
+    cursor: photo.busy ? "default" : "pointer",
     fontFamily: "Inter, sans-serif",
   };
 
@@ -11681,25 +11723,14 @@ function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
             overflow: "hidden",
           }}
         >
-          <AvatarContent kind={isBusiness ? "business" : "person"} url={url} size={30} />
+          <AvatarContent kind={isBusiness ? "business" : "person"} url={photo.url} size={30} />
         </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          aria-label={`Upload ${isBusiness ? "business logo" : "profile photo"}`}
-          onChange={(e) => onPick(e.target.files?.[0])}
-          style={{ display: "none" }}
-        />
-        <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} style={linkButton}>
-          {busy ? "Uploading…" : url ? `Change ${isBusiness ? "Logo" : "Photo"}` : `Upload ${isBusiness ? "Logo" : "Photo"}`}
+        {photo.fileInput}
+        <button type="button" disabled={photo.busy} onClick={photo.choose} style={linkButton}>
+          {photo.busy ? "Uploading…" : photo.uploadLabel}
         </button>
-        {url && !busy && (
-          <button
-            type="button"
-            onClick={() => setMyAvatarUrl(null).catch(() => setError(`Could not remove the ${noun} — please retry.`))}
-            style={{ ...linkButton, color: "#B91C1C" }}
-          >
+        {photo.url && !photo.busy && (
+          <button type="button" onClick={photo.remove} style={{ ...linkButton, color: "#B91C1C" }}>
             Remove
           </button>
         )}
@@ -11709,7 +11740,136 @@ function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
           ? "Shown on your project listings and in messages. JPG or PNG, up to 5 MB."
           : "Shown on your profile and in messages. JPG or PNG, up to 5 MB."}
       </div>
-      {error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C", marginTop: 4 }}>{error}</div>}
+      {photo.error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C", marginTop: 4 }}>{photo.error}</div>}
+    </div>
+  );
+}
+
+// Facebook-style viewer: the current photo (or default icon) at full size,
+// with upload / replace / remove beside it — below it on phones.
+function ProfilePhotoViewer({
+  name,
+  isBusiness,
+  isMobile,
+  onClose,
+}: {
+  name: string;
+  isBusiness: boolean;
+  isMobile: boolean;
+  onClose: () => void;
+}) {
+  const photo = useProfilePhotoActions(isBusiness);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const action: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1.5px solid #E2E8F0",
+    background: "#fff",
+    color: "#0F172A",
+    fontSize: 13.5,
+    fontWeight: 600,
+    cursor: photo.busy ? "default" : "pointer",
+    fontFamily: "Inter, sans-serif",
+    textAlign: "left",
+  };
+  const stage = isMobile ? "min(78vw, 340px)" : "min(56vh, 520px, calc(100vw - 340px))";
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${name} ${isBusiness ? "logo" : "profile photo"}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 120,
+        background: "rgba(15,23,42,0.88)",
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: isMobile ? 20 : 32,
+        padding: 20,
+        overflowY: "auto",
+      }}
+    >
+      <div
+        style={{
+          width: stage,
+          height: stage,
+          flexShrink: 0,
+          borderRadius: isBusiness ? 24 : "50%",
+          overflow: "hidden",
+          background: "linear-gradient(135deg, #93C5FD 0%, #1D4ED8 60%, #93C5FD 100%)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 12px 40px rgba(0,0,0,0.4)",
+        }}
+      >
+        <AvatarContent kind={isBusiness ? "business" : "person"} url={photo.url} size={isMobile ? 150 : 230} />
+      </div>
+
+      <div
+        style={{
+          width: isMobile ? "min(78vw, 340px)" : 260,
+          background: "#fff",
+          borderRadius: 14,
+          padding: 18,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          fontFamily: "Inter, sans-serif",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", overflowWrap: "anywhere" }}>{name}</div>
+            <div style={{ fontSize: 12.5, color: "#64748B" }}>
+              {photo.url ? (isBusiness ? "Business logo" : "Profile photo") : "No photo yet — showing the default"}
+            </div>
+          </div>
+          <button
+            ref={closeRef}
+            onClick={onClose}
+            aria-label="Close"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 22, lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
+        {photo.fileInput}
+        <button
+          type="button"
+          disabled={photo.busy}
+          onClick={photo.choose}
+          style={{ ...action, background: "#2563EB", color: "#fff", border: "none" }}
+        >
+          {photo.busy ? "Uploading…" : photo.uploadLabel}
+        </button>
+        {photo.url && !photo.busy && (
+          <button type="button" onClick={photo.remove} style={{ ...action, color: "#B91C1C" }}>
+            Remove {isBusiness ? "Logo" : "Photo"}
+          </button>
+        )}
+        <div style={{ fontSize: 11.5, color: "#94A3B8" }}>JPG or PNG, up to 5 MB.</div>
+        {photo.error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C" }}>{photo.error}</div>}
+      </div>
     </div>
   );
 }
