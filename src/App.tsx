@@ -824,14 +824,10 @@ function AdminSidebar({
             marginRight: collapsed ? "auto" : 0,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M13 6.66a7.5 7.5 0 010 12.68 7.5 7.5 0 010-12.68z" fill="#93C5FD" />
+            <circle cx="9" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
+            <circle cx="17" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
           </svg>
         </div>
         {!collapsed && (
@@ -1867,235 +1863,6 @@ const studentNavItems = [
 
   { icon: IconSettings, label: "Settings", id: "settings" },
 ];
-
-function DevSidebar({
-  active,
-
-  onNav,
-
-  collapsed,
-}: {
-  active: string;
-
-  onNav: (id: string) => void;
-
-  collapsed: boolean;
-}) {
-  const profile = useDevProfile();
-  // Admin never renders this sidebar (it gets AdminSidebar instead, on every
-  // page it can reach — see the page === "developer" branch), so this is
-  // always the full student nav.
-  const visibleDevNavItems = studentNavItems;
-
-  return (
-    <aside
-      style={{
-        width: collapsed ? 72 : 260,
-
-        minHeight: "100vh",
-
-        background: "#fff",
-
-        borderRight: "1px solid #E2E8F0",
-
-        display: "flex",
-
-        flexDirection: "column",
-
-        flexShrink: 0,
-
-        transition: "width 0.2s ease",
-
-        position: "sticky",
-
-        top: 0,
-
-        height: "100vh",
-
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          padding: collapsed ? "20px 0" : "20px 24px",
-
-          display: "flex",
-
-          alignItems: "center",
-
-          gap: 10,
-
-          borderBottom: "1px solid #F1F5F9",
-        }}
-      >
-        <div
-          style={{
-            width: 36,
-
-            height: 36,
-
-            borderRadius: 8,
-
-            flexShrink: 0,
-
-            background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-
-            display: "flex",
-
-            alignItems: "center",
-
-            justifyContent: "center",
-
-            marginLeft: collapsed ? "auto" : 0,
-
-            marginRight: collapsed ? "auto" : 0,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-        {!collapsed && (
-          <div>
-            <div
-              style={{
-                fontWeight: 700,
-
-                fontSize: 15,
-
-                color: "#0F172A",
-
-                letterSpacing: "-0.02em",
-              }}
-            >
-              StartupMatch
-            </div>
-            <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>
-              Tagum City
-            </div>
-          </div>
-        )}
-      </div>
-      <nav style={{ padding: "12px 0", flex: 1 }}>
-        {visibleDevNavItems.map(({ icon: Icon, label, id }) => {
-          const isActive = active === id;
-
-          return (
-            <button
-              key={id}
-              onClick={() => onNav(id)}
-              style={{
-                width: "100%",
-
-                display: "flex",
-
-                alignItems: "center",
-
-                gap: 12,
-
-                padding: collapsed ? "10px 0" : "10px 20px",
-
-                justifyContent: collapsed ? "center" : "flex-start",
-
-                border: "none",
-
-                background: isActive ? "#EFF6FF" : "transparent",
-
-                color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
-
-                cursor: "pointer",
-
-                fontFamily: "Inter, sans-serif",
-
-                fontSize: 14,
-
-                fontWeight: isActive ? 600 : 500,
-
-                transition: "all 0.15s ease",
-
-                borderRadius: collapsed ? 0 : "0 8px 8px 0",
-
-                marginRight: collapsed ? 0 : 12,
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "#F8FAFC";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "transparent";
-              }}
-            >
-              <Icon size={20} />
-              {!collapsed && label}
-            </button>
-          );
-        })}
-      </nav>
-      {!collapsed && (
-        <div style={{ padding: "16px 20px", borderTop: "1px solid #F1F5F9" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 32,
-
-                height: 32,
-
-                borderRadius: "50%",
-
-                flexShrink: 0,
-
-                background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[1]})`,
-
-                display: "flex",
-
-                alignItems: "center",
-
-                justifyContent: "center",
-
-                fontSize: 12,
-
-                fontWeight: 700,
-
-                color: "#fff",
-              }}
-            >
-              <MyAvatar kind="person" size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
-                {profile.name}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-
-                  color: profile.availability ? "#16A34A" : "#64748B",
-
-                  fontWeight: 600,
-                }}
-              >
-                {profile.availability ? "● Open to Work" : "● Not Open to Work"}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </aside>
-  );
-}
 
 function DevStatusPill({ status }: { status: string }) {
   const cfg =
@@ -4279,7 +4046,24 @@ function NotificationBell() {
   );
 }
 
-function SprintSidebar({
+const sidebarCardLink: React.CSSProperties = {
+  marginTop: 8,
+  padding: 0,
+  border: "none",
+  background: "none",
+  color: "#2563EB",
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: "pointer",
+  fontFamily: "Inter, sans-serif",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+};
+
+// The one sidebar for every student page, so the menu and the Active
+// Project card never change or disappear as you move between pages.
+function StudentSidebar({
   active,
 
   onNav,
@@ -4292,11 +4076,11 @@ function SprintSidebar({
 
   collapsed: boolean;
 }) {
-  // Admin never renders this sidebar (it gets AdminSidebar instead, on every
-  // page it can reach — see the page === "sprint" branch), so this is
-  // always the full student nav.
+  // Admin never renders this sidebar (it gets AdminSidebar instead).
   const visibleItems = studentNavItems;
   const project = useProjectStore();
+  // Demo sessions show the seed project; a real user only once a real contract is loaded.
+  const hasProject = !getCachedAuthProfile() || isUsingRealContract();
   const contracts = useContractSummaries();
 
   const profile = useDevProfile();
@@ -4365,14 +4149,10 @@ function SprintSidebar({
             marginRight: collapsed ? "auto" : 0,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M13 6.66a7.5 7.5 0 010 12.68 7.5 7.5 0 010-12.68z" fill="#93C5FD" />
+            <circle cx="9" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
+            <circle cx="17" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
           </svg>
         </div>
         {!collapsed && (
@@ -4397,79 +4177,77 @@ function SprintSidebar({
         )}
       </div>
 
-      {/* Active project chip — hidden for a real signed-in user with no
-          real contract loaded, instead of showing the demo seed project. */}
-      {!collapsed && (!getCachedAuthProfile() || isUsingRealContract()) && (
+      {!collapsed && (
         <div
           style={{
             margin: "12px 16px 4px",
-
             padding: "10px 12px",
-
             background: "#F0F7FF",
-
             border: "1px solid #BFDBFE",
-
             borderRadius: 10,
           }}
         >
           <div
             style={{
               fontSize: 10,
-
               fontWeight: 700,
-
               color: "#2563EB",
-
               textTransform: "uppercase",
-
               letterSpacing: "0.06em",
-
               marginBottom: 3,
             }}
           >
             Active Project
           </div>
-          {contracts.length > 1 ? (
-            <select
-              value={project.id}
-              onChange={(e) => selectContract(e.target.value)}
-              style={{
-                width: "100%",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#0F172A",
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                fontFamily: "Inter, sans-serif",
-              }}
-            >
-              {contracts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title} {c.status === "Completed" ? "(Completed)" : ""}
-                </option>
-              ))}
-            </select>
+          {hasProject ? (
+            <>
+              {contracts.length > 1 ? (
+                <select
+                  aria-label="Switch active project"
+                  value={project.id}
+                  onChange={(e) => selectContract(e.target.value)}
+                  style={{
+                    width: "100%",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#0F172A",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                >
+                  {contracts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title} {c.status === "Completed" ? "(Completed)" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#0F172A", lineHeight: 1.3 }}>
+                  {project.project}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{project.client}</div>
+              {active !== "sprint" && (
+                <button onClick={() => onNav("sprint")} style={sidebarCardLink}>
+                  Open Sprint Board <IconChevron size={12} dir="right" />
+                </button>
+              )}
+            </>
           ) : (
-            <div
-              style={{
-                fontSize: 12,
-
-                fontWeight: 600,
-
-                color: "#0F172A",
-
-                lineHeight: 1.3,
-              }}
-            >
-              {project.project}
-            </div>
+            <>
+              <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.4 }}>
+                No active project yet. Win a bid to start one.
+              </div>
+              {active !== "marketplace" && (
+                <button onClick={() => onNav("marketplace")} style={sidebarCardLink}>
+                  Browse Marketplace <IconChevron size={12} dir="right" />
+                </button>
+              )}
+            </>
           )}
-          <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-            {project.client}
-          </div>
         </div>
       )}
 
@@ -4542,63 +4320,22 @@ function SprintSidebar({
             <div
               style={{
                 width: 32,
-
                 height: 32,
-
                 borderRadius: "50%",
-
                 flexShrink: 0,
-
-                background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[0]})`,
-
+                background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[1]})`,
                 display: "flex",
-
                 alignItems: "center",
-
                 justifyContent: "center",
-
-                fontSize: 11,
-
-                fontWeight: 700,
-
-                color: profile.avatarColors[1],
+                color: "#fff",
               }}
             >
               <MyAvatar kind="person" size={18} />
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
-                {profile.name}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-
-                  color: "#16A34A",
-
-                  fontWeight: 600,
-
-                  display: "flex",
-
-                  alignItems: "center",
-
-                  gap: 4,
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-
-                    height: 6,
-
-                    borderRadius: "50%",
-
-                    background: "#16A34A",
-
-                    display: "inline-block",
-                  }}
-                />
-                Active Sprint
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{profile.name}</div>
+              <div style={{ fontSize: 11, color: profile.availability ? "#16A34A" : "#64748B", fontWeight: 600 }}>
+                {profile.availability ? "● Open to Work" : "● Not Open to Work"}
               </div>
             </div>
           </div>
@@ -10648,14 +10385,10 @@ function ClientSidebar({
             marginRight: collapsed ? "auto" : 0,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M13 6.66a7.5 7.5 0 010 12.68 7.5 7.5 0 010-12.68z" fill="#93C5FD" />
+            <circle cx="9" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
+            <circle cx="17" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
           </svg>
         </div>
         {!collapsed && (
@@ -12290,7 +12023,7 @@ function MilestoneTrackingPage({
 
   // A real user with no real contract loaded must never see the demo seed
   // project's dispute/comment state (same mock-data-leak class fixed in
-  // SprintSidebar, ClientOverview, and ProjectContractsView).
+  // StudentSidebar, ClientOverview, and ProjectContractsView).
   const hasRealOrDemoProject = !getCachedAuthProfile() || isUsingRealContract();
 
   // The discussion panel below always centers on "the phase currently in
@@ -16506,7 +16239,7 @@ export default function App() {
                     collapsed={collapsed}
                   />
                 ) : (
-                  <DevSidebar
+                  <StudentSidebar
                     active={devNav === "dashboard" ? "profile" : devNav}
                     onNav={(id) => {
                       if (id === "sprintoverview" || id === "sprint") {
@@ -16948,7 +16681,7 @@ export default function App() {
                     collapsed={collapsed}
                   />
                 ) : (
-                  <SprintSidebar
+                  <StudentSidebar
                     active={sprintNav === "dashboard" ? "sprintoverview" : sprintNav}
                     onNav={(id) => {
                       if (id === "sprintoverview") {
