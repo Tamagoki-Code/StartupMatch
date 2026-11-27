@@ -1434,7 +1434,8 @@ function RealAccountsPanel({
   const filtered = profiles.filter((p) => {
     if (roleFilter && p.role !== roleFilter) return false;
     const q = search.trim().toLowerCase();
-    const matchSearch = !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+    const matchSearch =
+      !q || [p.name, p.email, p.idNumber, p.business].some((v) => v?.toLowerCase().includes(q));
     const matchStatus = statusFilter === "All" || p.verificationStatus === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -1483,7 +1484,7 @@ function RealAccountsPanel({
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFC" }}>
-                {["Name", "Email", "Role", "Status", "Joined", "Document", "Actions"].map((h) => (
+                {["Name", "Email", "Role", "ID Number", "Status", "Joined", "Uploaded Documents", "Actions"].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -1529,10 +1530,31 @@ function RealAccountsPanel({
                         }}
                       />
                       {p.name} {isSelf && <span style={{ color: "#94A3B8", fontWeight: 500 }}>(you)</span>}
+                      {(p.business || p.school) && (
+                        <div style={{ fontSize: 12, fontWeight: 500, color: "#64748B", marginTop: 2, paddingLeft: 14 }}>
+                          {p.role === "enterprise"
+                            ? [p.business, p.barangay].filter(Boolean).join(" · ")
+                            : p.school}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: "13px 16px", color: "#475569", whiteSpace: "nowrap" }}>{p.email}</td>
                     <td style={{ padding: "13px 16px", color: "#475569", textTransform: "capitalize" }}>
                       {p.role}
+                    </td>
+                    <td style={{ padding: "13px 16px", whiteSpace: "nowrap" }}>
+                      {p.idNumber ? (
+                        <>
+                          <div style={{ fontWeight: 600, color: "#0F172A", fontFamily: "ui-monospace, monospace", fontSize: 12.5 }}>
+                            {p.idNumber}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#94A3B8" }}>
+                            {p.role === "enterprise" ? "Permit / DTI No." : "Academic ID"}
+                          </div>
+                        </>
+                      ) : (
+                        <span style={{ color: "#CBD5E1", fontSize: 12.5 }}>Not provided</span>
+                      )}
                     </td>
                     <td style={{ padding: "13px 16px" }}>
                       <span
@@ -1559,30 +1581,41 @@ function RealAccountsPanel({
                     </td>
                     <td style={{ padding: "13px 16px" }}>
                       {p.documentUrl || p.establishmentPhotoUrl ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                          {p.documentUrl && (
-                            <a
-                              href={p.documentUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: "#2563EB", fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}
-                            >
-                              {p.role === "enterprise" ? "View Permit" : "View Document"}
-                            </a>
-                          )}
-                          {p.establishmentPhotoUrl && (
-                            <a
-                              href={p.establishmentPhotoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: "#2563EB", fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}
-                            >
-                              View Storefront
-                            </a>
-                          )}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {[
+                            { url: p.documentUrl, label: p.role === "enterprise" ? "Permit" : "Academic ID" },
+                            { url: p.establishmentPhotoUrl, label: "Storefront" },
+                          ]
+                            .filter((d): d is { url: string; label: string } => !!d.url)
+                            .map((d) => (
+                              <a
+                                key={d.label}
+                                href={d.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={`Open ${d.label} full size`}
+                                style={{ display: "flex", flexDirection: "column", gap: 3, textDecoration: "none" }}
+                              >
+                                <img
+                                  src={d.url}
+                                  alt={`${p.name} — ${d.label}`}
+                                  loading="lazy"
+                                  style={{
+                                    width: 64,
+                                    height: 44,
+                                    objectFit: "cover",
+                                    borderRadius: 6,
+                                    border: "1px solid #E2E8F0",
+                                    background: "#F1F5F9",
+                                    display: "block",
+                                  }}
+                                />
+                                <span style={{ color: "#2563EB", fontSize: 11, fontWeight: 600 }}>{d.label}</span>
+                              </a>
+                            ))}
                         </div>
                       ) : (
-                        <span style={{ color: "#CBD5E1", fontSize: 12.5 }}>None</span>
+                        <span style={{ color: "#CBD5E1", fontSize: 12.5 }}>None uploaded</span>
                       )}
                     </td>
                     <td style={{ padding: "13px 16px" }}>
