@@ -205,6 +205,8 @@ export default function ResumeCheckPage() {
   }
 
   const busy = stage === "loading-model" || stage === "analyzing"
+  const [dragging, setDragging] = useState(false)
+  const touchScreen = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -220,41 +222,39 @@ export default function ResumeCheckPage() {
       </div>
 
       <div style={{ ...CARD, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setMode("auto")}
-            style={{
-              flex: 1,
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: `1.5px solid ${mode === "auto" ? "#2563EB" : "#E2E8F0"}`,
-              background: mode === "auto" ? "#EFF6FF" : "#fff",
-              color: mode === "auto" ? "#1D4ED8" : "#475569",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "Inter, sans-serif",
-            }}
-          >
-            Auto-Match: Discover My Best Role
-          </button>
-          <button
-            onClick={() => setMode("targeted")}
-            style={{
-              flex: 1,
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: `1.5px solid ${mode === "targeted" ? "#2563EB" : "#E2E8F0"}`,
-              background: mode === "targeted" ? "#EFF6FF" : "#fff",
-              color: mode === "targeted" ? "#1D4ED8" : "#475569",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "Inter, sans-serif",
-            }}
-          >
-            Targeted Check: Test a Specific Role
-          </button>
+        <div
+          role="tablist"
+          aria-label="Check type"
+          style={{ display: "flex", gap: 4, padding: 4, background: "#F1F5F9", borderRadius: 10 }}
+        >
+          {([
+            ["auto", "Auto-Match", "Find the role you fit best"],
+            ["targeted", "Targeted Check", "Score against one role"],
+          ] as const).map(([id, title, sub]) => {
+            const on = mode === id
+            return (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={on}
+                onClick={() => setMode(id)}
+                style={{
+                  flex: 1,
+                  padding: "9px 12px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: on ? "#fff" : "transparent",
+                  boxShadow: on ? "0 1px 3px rgba(15,23,42,0.1)" : "none",
+                  cursor: "pointer",
+                  fontFamily: "Inter, sans-serif",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, color: on ? "#1D4ED8" : "#334155" }}>{title}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 500, color: "#64748B", marginTop: 1 }}>{sub}</div>
+              </button>
+            )
+          })}
         </div>
 
         {mode === "targeted" && (
@@ -292,32 +292,82 @@ export default function ResumeCheckPage() {
         <button
           disabled={busy}
           onClick={() => fileInputRef.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault()
+            if (!busy) setDragging(true)
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDragging(false)
+            const f = e.dataTransfer.files?.[0]
+            if (f && !busy) void handleFile(f)
+          }}
           style={{
-            padding: "12px 16px",
-            borderRadius: 8,
-            border: "1.5px dashed #CBD5E1",
-            background: "#F8FAFC",
+            padding: "28px 16px",
+            borderRadius: 12,
+            border: `1.5px dashed ${dragging ? "#2563EB" : "#CBD5E1"}`,
+            background: dragging ? "#EFF6FF" : "#F8FAFC",
             color: "#475569",
-            fontSize: 13.5,
-            fontWeight: 600,
             cursor: busy ? "default" : "pointer",
             fontFamily: "Inter, sans-serif",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
           }}
         >
-          {busy ? "Analyzing…" : "Upload your resume (PDF)"}
+          <span
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              background: "#fff",
+              border: "1px solid #E2E8F0",
+              color: "#2563EB",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width={20} height={20} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10 13V3.5M6.5 7L10 3.5 13.5 7" />
+              <path d="M3 13.5V15a2 2 0 002 2h10a2 2 0 002-2v-1.5" />
+            </svg>
+          </span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>
+            {stage === "loading-model" ? "Preparing the matching model…" : stage === "analyzing" ? "Analyzing your resume…" : "Upload your resume"}
+          </span>
+          <span style={{ fontSize: 12.5, fontWeight: 500, color: "#64748B" }}>
+            {busy
+              ? "This stays in your browser."
+              : touchScreen
+                ? "Tap to choose a PDF"
+                : "Drop a PDF here or click to choose one"}
+          </span>
         </button>
 
         {stage === "loading-model" && (
-          <div style={{ fontSize: 12.5, color: "#64748B" }}>
-            {modelProgress > 0
-              ? `Downloading AI model (first time only)… ${Math.round(modelProgress)}%`
-              : "Preparing AI model…"}
+          <div role="status" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ height: 6, borderRadius: 99, background: "#E2E8F0", overflow: "hidden" }}>
+              <div
+                style={{
+                  height: "100%",
+                  width: `${Math.max(4, Math.round(modelProgress))}%`,
+                  background: "#2563EB",
+                  borderRadius: 99,
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>
+              {modelProgress > 0
+                ? `Downloading the AI model (first time only) — ${Math.round(modelProgress)}%`
+                : "Starting the AI model…"}
+            </div>
           </div>
         )}
-        {stage === "analyzing" && (
-          <div style={{ fontSize: 12.5, color: "#64748B" }}>Analyzing your resume…</div>
-        )}
-        {error && <div style={{ fontSize: 12.5, color: "#DC2626" }}>{error}</div>}
+        {error && <div role="alert" style={{ fontSize: 12.5, color: "#B91C1C", fontWeight: 500 }}>{error}</div>}
         {savedNote && <div style={{ fontSize: 12.5, color: "#16A34A" }}>{savedNote}</div>}
         {!isRealStudent && stage === "done" && (
           <div style={{ fontSize: 12, color: "#94A3B8" }}>

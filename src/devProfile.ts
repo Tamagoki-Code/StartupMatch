@@ -85,6 +85,11 @@ export interface MarketplaceProject {
   phases: number
 
   postedAt: string
+
+  // Real listings only; demo data has no owner account to message.
+  enterpriseId?: string
+
+  avatarUrl?: string | null
 }
 
 export interface DevIdentity {

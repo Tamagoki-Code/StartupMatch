@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, lazy, Suspense } from "react";
 
 import {
   AreaChart,
@@ -113,6 +113,10 @@ import {
   searchMessageableProfiles,
 } from "./messages";
 import type { MessageableProfile } from "./messages";
+import { HelpButton, SupportTicketsPage } from "./SupportTickets";
+import { projectDuration, projectTimeline } from "./timeline";
+import { uploadVerificationDocument } from "./cloudinary";
+import { useMyAvatarUrl, setMyAvatarUrl } from "./avatar";
 
 import * as contractsApi from "./contracts";
 
@@ -551,98 +555,45 @@ function Card({
   );
 }
 
+// Countdown wording used everywhere: never a negative "days left".
+function daysLeftText(days: number): string {
+  if (days < 0) return `${Math.abs(days)}d overdue`;
+  if (days === 0) return "Due today";
+  return `${days}d left`;
+}
+
+type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
+
+// The design system's five status tones: every lifecycle status maps to one.
+const STATUS_TONE: Record<StatusTone, { bg: string; color: string; border: string; dot: string }> = {
+  success: { bg: "#F0FDF4", color: "#15803D", border: "#BBF7D0", dot: "#16A34A" },
+  warning: { bg: "#FFFBEB", color: "#B45309", border: "#FDE68A", dot: "#D97706" },
+  danger: { bg: "#FEF2F2", color: "#B91C1C", border: "#FECACA", dot: "#DC2626" },
+  info: { bg: "#EFF6FF", color: "#1D4ED8", border: "#BFDBFE", dot: "#2563EB" },
+  neutral: { bg: "#F8FAFC", color: "#475569", border: "#E2E8F0", dot: "#94A3B8" },
+};
+
+const STATUS_TONE_OF: Record<string, StatusTone> = {
+  Verified: "success",
+  Active: "success",
+  Awarded: "success",
+  Approved: "success",
+  Completed: "success",
+  "Pending Review": "warning",
+  Pending: "warning",
+  "In Review": "warning",
+  Rejected: "danger",
+  Suspended: "danger",
+  Declined: "danger",
+  Disputed: "danger",
+  "Under Review": "info",
+  Open: "info",
+  Closed: "neutral",
+  Draft: "neutral",
+};
+
 function StatusPill({ status }: { status: string }) {
-  const cfg: Record<
-    string,
-    {
-      bg: string;
-      color: string;
-      border: string;
-      dot: string;
-    }
-  > = {
-    "Pending Review": {
-      bg: "#FFFBEB",
-
-      color: "#D97706",
-
-      border: "#FDE68A",
-
-      dot: "#D97706",
-    },
-
-    Verified: {
-      bg: "#F0FDF4",
-
-      color: "#16A34A",
-
-      border: "#BBF7D0",
-
-      dot: "#16A34A",
-    },
-
-    Rejected: {
-      bg: "#FEF2F2",
-
-      color: "#DC2626",
-
-      border: "#FECACA",
-
-      dot: "#DC2626",
-    },
-
-    "Under Review": {
-      bg: "#EFF6FF",
-
-      color: "#2563EB",
-
-      border: "#BFDBFE",
-
-      dot: "#2563EB",
-    },
-
-    Active: {
-      bg: "#F0FDF4",
-
-      color: "#16A34A",
-
-      border: "#BBF7D0",
-
-      dot: "#16A34A",
-    },
-
-    Suspended: {
-      bg: "#FEF2F2",
-
-      color: "#DC2626",
-
-      border: "#FECACA",
-
-      dot: "#DC2626",
-    },
-
-    Open: {
-      bg: "#EFF6FF",
-
-      color: "#2563EB",
-
-      border: "#BFDBFE",
-
-      dot: "#2563EB",
-    },
-
-    Closed: {
-      bg: "#F1F5F9",
-
-      color: "#64748B",
-
-      border: "#E2E8F0",
-
-      dot: "#94A3B8",
-    },
-  };
-
-  const c = cfg[status] ?? cfg["Pending Review"];
+  const c = STATUS_TONE[STATUS_TONE_OF[status] ?? "neutral"];
 
   return (
     <span
@@ -735,7 +686,7 @@ const adminNavItems = [
 
   { icon: IconLogs, label: "Audit Logs", id: "auditlogs" },
 
-  { icon: IconMessages, label: "Messages", id: "messages" },
+  { icon: IconMessages, label: "Support Tickets", id: "support" },
 
   { icon: IconSettings, label: "Settings", id: "settings" },
 ];
@@ -820,14 +771,10 @@ function AdminSidebar({
             marginRight: collapsed ? "auto" : 0,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M13 6.66a7.5 7.5 0 010 12.68 7.5 7.5 0 010-12.68z" fill="#93C5FD" />
+            <circle cx="9" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
+            <circle cx="17" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
           </svg>
         </div>
         {!collapsed && (
@@ -853,7 +800,7 @@ function AdminSidebar({
       </div>
 
       {/* Nav */}
-      <nav style={{ padding: "10px 0", flex: 1 }}>
+      <nav style={{ padding: "10px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
         {adminNavItems.map(({ icon: Icon, label, id }) => {
           const isActive = active === id;
 
@@ -870,7 +817,7 @@ function AdminSidebar({
 
                 gap: 11,
 
-                padding: collapsed ? "11px 0" : "11px 20px",
+                padding: collapsed ? "11px 0" : "11px 12px",
 
                 justifyContent: collapsed ? "center" : "flex-start",
 
@@ -879,10 +826,6 @@ function AdminSidebar({
                 background: isActive ? "#EFF6FF" : "transparent",
 
                 color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
 
                 cursor: "pointer",
 
@@ -893,6 +836,8 @@ function AdminSidebar({
                 fontWeight: isActive ? 600 : 500,
 
                 transition: "all 0.12s ease",
+
+                borderRadius: 8,
               }}
               onMouseEnter={(e) => {
                 if (!isActive)
@@ -947,7 +892,7 @@ function AdminSidebar({
                 color: "#fff",
               }}
             >
-              {profile.initials}
+              <MyAvatar kind="person" size={18} />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -990,11 +935,11 @@ function AuditLogsPage() {
       </div>
       <Card style={{ overflow: "hidden", padding: 0 }}>
         {loading ? (
-          <EmptyState message="Loading audit log…" />
+          <EmptyState variant="loading" message="Loading audit log…" />
         ) : error ? (
-          <EmptyState message={`Failed to load: ${error}`} />
+          <EmptyState variant="error" message={`Failed to load: ${error}`} />
         ) : rows.length === 0 ? (
-          <EmptyState message="No audit events yet. They'll show up here as verifications, awards, and milestone reviews happen." />
+          <EmptyState icon={<IconLogs size={20} />} message="No audit events yet. They'll show up here as verifications, awards, and milestone reviews happen." />
         ) : (
           <AuditTable rows={rows} />
         )}
@@ -1430,7 +1375,8 @@ function RealAccountsPanel({
   const filtered = profiles.filter((p) => {
     if (roleFilter && p.role !== roleFilter) return false;
     const q = search.trim().toLowerCase();
-    const matchSearch = !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+    const matchSearch =
+      !q || [p.name, p.email, p.idNumber, p.business].some((v) => v?.toLowerCase().includes(q));
     const matchStatus = statusFilter === "All" || p.verificationStatus === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -1458,11 +1404,11 @@ function RealAccountsPanel({
     <Card style={{ overflow: "hidden", padding: 0 }}>
       {loading ? (
         <div style={{ padding: 24 }}>
-          <EmptyState message="Loading real accounts…" />
+          <EmptyState variant="loading" message="Loading real accounts…" />
         </div>
       ) : error ? (
         <div style={{ padding: 24 }}>
-          <EmptyState message={`Failed to load: ${error}`} />
+          <EmptyState variant="error" message={`Failed to load: ${error}`} />
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: 24 }}>
@@ -1479,7 +1425,7 @@ function RealAccountsPanel({
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFC" }}>
-                {["Name", "Email", "Role", "Status", "Joined", "Document", "Actions"].map((h) => (
+                {["Name", "Email", "Role", "ID Number", "Status", "Joined", "Uploaded Documents", "Actions"].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -1525,10 +1471,31 @@ function RealAccountsPanel({
                         }}
                       />
                       {p.name} {isSelf && <span style={{ color: "#94A3B8", fontWeight: 500 }}>(you)</span>}
+                      {(p.business || p.school) && (
+                        <div style={{ fontSize: 12, fontWeight: 500, color: "#64748B", marginTop: 2, paddingLeft: 14 }}>
+                          {p.role === "enterprise"
+                            ? [p.business, p.barangay].filter(Boolean).join(" · ")
+                            : p.school}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: "13px 16px", color: "#475569", whiteSpace: "nowrap" }}>{p.email}</td>
                     <td style={{ padding: "13px 16px", color: "#475569", textTransform: "capitalize" }}>
                       {p.role}
+                    </td>
+                    <td style={{ padding: "13px 16px", whiteSpace: "nowrap" }}>
+                      {p.idNumber ? (
+                        <>
+                          <div style={{ fontWeight: 600, color: "#0F172A", fontFamily: "ui-monospace, monospace", fontSize: 12.5 }}>
+                            {p.idNumber}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#94A3B8" }}>
+                            {p.role === "enterprise" ? "Permit / DTI No." : "Academic ID"}
+                          </div>
+                        </>
+                      ) : (
+                        <span style={{ color: "#CBD5E1", fontSize: 12.5 }}>Not provided</span>
+                      )}
                     </td>
                     <td style={{ padding: "13px 16px" }}>
                       <span
@@ -1555,30 +1522,41 @@ function RealAccountsPanel({
                     </td>
                     <td style={{ padding: "13px 16px" }}>
                       {p.documentUrl || p.establishmentPhotoUrl ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                          {p.documentUrl && (
-                            <a
-                              href={p.documentUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: "#2563EB", fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}
-                            >
-                              {p.role === "enterprise" ? "View Permit" : "View Document"}
-                            </a>
-                          )}
-                          {p.establishmentPhotoUrl && (
-                            <a
-                              href={p.establishmentPhotoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: "#2563EB", fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}
-                            >
-                              View Storefront
-                            </a>
-                          )}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {[
+                            { url: p.documentUrl, label: p.role === "enterprise" ? "Permit" : "Academic ID" },
+                            { url: p.establishmentPhotoUrl, label: "Storefront" },
+                          ]
+                            .filter((d): d is { url: string; label: string } => !!d.url)
+                            .map((d) => (
+                              <a
+                                key={d.label}
+                                href={d.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={`Open ${d.label} full size`}
+                                style={{ display: "flex", flexDirection: "column", gap: 3, textDecoration: "none" }}
+                              >
+                                <img
+                                  src={d.url}
+                                  alt={`${p.name} — ${d.label}`}
+                                  loading="lazy"
+                                  style={{
+                                    width: 64,
+                                    height: 44,
+                                    objectFit: "cover",
+                                    borderRadius: 6,
+                                    border: "1px solid #E2E8F0",
+                                    background: "#F1F5F9",
+                                    display: "block",
+                                  }}
+                                />
+                                <span style={{ color: "#2563EB", fontSize: 11, fontWeight: 600 }}>{d.label}</span>
+                              </a>
+                            ))}
                         </div>
                       ) : (
-                        <span style={{ color: "#CBD5E1", fontSize: 12.5 }}>None</span>
+                        <span style={{ color: "#CBD5E1", fontSize: 12.5 }}>None uploaded</span>
                       )}
                     </td>
                     <td style={{ padding: "13px 16px" }}>
@@ -1770,33 +1748,71 @@ function SetNewPasswordScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
+function IconInbox({ size = 22 }: { size?: number }) {
   return (
-    <div style={{ padding: "48px 24px", textAlign: "center" }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 13l2.6-7.2A2 2 0 017.5 4.5h9a2 2 0 011.9 1.3L21 13" />
+      <path d="M3 13v5a2 2 0 002 2h14a2 2 0 002-2v-5h-5l-1.5 2.5h-5L7 13H3z" />
+    </svg>
+  );
+}
+
+// One component for the three "nothing to show yet" situations: still
+// loading (skeleton lines), failed (red, announced), or genuinely empty.
+function EmptyState({
+  message,
+  variant = "empty",
+  icon,
+}: {
+  message: string;
+  variant?: "empty" | "loading" | "error";
+  icon?: React.ReactNode;
+}) {
+  if (variant === "loading") {
+    return (
+      <div role="status" aria-busy="true" style={{ padding: "28px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {[92, 68, 80].map((w) => (
+          <div key={w} className="sm-skeleton" style={{ height: 12, width: `${w}%` }} />
+        ))}
+        <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{message}</span>
+      </div>
+    );
+  }
+  const isError = variant === "error";
+  return (
+    <div role={isError ? "alert" : undefined} style={{ padding: "44px 24px", textAlign: "center" }}>
       <div
         style={{
-          width: 56,
-
-          height: 56,
-
-          borderRadius: 14,
-
-          background: "#F1F5F9",
-
-          margin: "0 auto 14px",
-
+          width: 48,
+          height: 48,
+          borderRadius: "50%",
+          background: isError ? "#FEF2F2" : "#F1F5F9",
+          margin: "0 auto 12px",
           display: "flex",
-
           alignItems: "center",
-
           justifyContent: "center",
-
-          color: "#94A3B8",
+          color: isError ? "#DC2626" : "#64748B",
         }}
       >
-        <IconShield size={24} />
+        {isError ? (
+          <svg width={22} height={22} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8.7 3.4L1.9 15a1.5 1.5 0 001.3 2.2h13.6a1.5 1.5 0 001.3-2.2L11.3 3.4a1.5 1.5 0 00-2.6 0z" />
+            <path d="M10 8v3.4M10 14.2v.1" />
+          </svg>
+        ) : (
+          icon ?? <IconInbox />
+        )}
       </div>
-      <p style={{ margin: 0, fontSize: 14, color: "#94A3B8", fontWeight: 500 }}>
+      <p
+        style={{
+          margin: "0 auto",
+          maxWidth: 380,
+          fontSize: 13.5,
+          lineHeight: 1.55,
+          color: isError ? "#B91C1C" : "#64748B",
+          fontWeight: 500,
+        }}
+      >
         {message}
       </p>
     </div>
@@ -1830,235 +1846,6 @@ const studentNavItems = [
 
   { icon: IconSettings, label: "Settings", id: "settings" },
 ];
-
-function DevSidebar({
-  active,
-
-  onNav,
-
-  collapsed,
-}: {
-  active: string;
-
-  onNav: (id: string) => void;
-
-  collapsed: boolean;
-}) {
-  const profile = useDevProfile();
-  // Admin never renders this sidebar (it gets AdminSidebar instead, on every
-  // page it can reach — see the page === "developer" branch), so this is
-  // always the full student nav.
-  const visibleDevNavItems = studentNavItems;
-
-  return (
-    <aside
-      style={{
-        width: collapsed ? 72 : 260,
-
-        minHeight: "100vh",
-
-        background: "#fff",
-
-        borderRight: "1px solid #E2E8F0",
-
-        display: "flex",
-
-        flexDirection: "column",
-
-        flexShrink: 0,
-
-        transition: "width 0.2s ease",
-
-        position: "sticky",
-
-        top: 0,
-
-        height: "100vh",
-
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          padding: collapsed ? "20px 0" : "20px 24px",
-
-          display: "flex",
-
-          alignItems: "center",
-
-          gap: 10,
-
-          borderBottom: "1px solid #F1F5F9",
-        }}
-      >
-        <div
-          style={{
-            width: 36,
-
-            height: 36,
-
-            borderRadius: 8,
-
-            flexShrink: 0,
-
-            background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-
-            display: "flex",
-
-            alignItems: "center",
-
-            justifyContent: "center",
-
-            marginLeft: collapsed ? "auto" : 0,
-
-            marginRight: collapsed ? "auto" : 0,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-        {!collapsed && (
-          <div>
-            <div
-              style={{
-                fontWeight: 700,
-
-                fontSize: 15,
-
-                color: "#0F172A",
-
-                letterSpacing: "-0.02em",
-              }}
-            >
-              StartupMatch
-            </div>
-            <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>
-              Tagum City
-            </div>
-          </div>
-        )}
-      </div>
-      <nav style={{ padding: "12px 0", flex: 1 }}>
-        {visibleDevNavItems.map(({ icon: Icon, label, id }) => {
-          const isActive = active === id;
-
-          return (
-            <button
-              key={id}
-              onClick={() => onNav(id)}
-              style={{
-                width: "100%",
-
-                display: "flex",
-
-                alignItems: "center",
-
-                gap: 12,
-
-                padding: collapsed ? "10px 0" : "10px 20px",
-
-                justifyContent: collapsed ? "center" : "flex-start",
-
-                border: "none",
-
-                background: isActive ? "#EFF6FF" : "transparent",
-
-                color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
-
-                cursor: "pointer",
-
-                fontFamily: "Inter, sans-serif",
-
-                fontSize: 14,
-
-                fontWeight: isActive ? 600 : 500,
-
-                transition: "all 0.15s ease",
-
-                borderRadius: collapsed ? 0 : "0 8px 8px 0",
-
-                marginRight: collapsed ? 0 : 12,
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "#F8FAFC";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "transparent";
-              }}
-            >
-              <Icon size={20} />
-              {!collapsed && label}
-            </button>
-          );
-        })}
-      </nav>
-      {!collapsed && (
-        <div style={{ padding: "16px 20px", borderTop: "1px solid #F1F5F9" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 32,
-
-                height: 32,
-
-                borderRadius: "50%",
-
-                flexShrink: 0,
-
-                background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[1]})`,
-
-                display: "flex",
-
-                alignItems: "center",
-
-                justifyContent: "center",
-
-                fontSize: 12,
-
-                fontWeight: 700,
-
-                color: "#fff",
-              }}
-            >
-              {profile.initials}
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
-                {profile.name}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-
-                  color: profile.availability ? "#16A34A" : "#64748B",
-
-                  fontWeight: 600,
-                }}
-              >
-                {profile.availability ? "● Open to Work" : "● Not Open to Work"}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </aside>
-  );
-}
 
 function DevStatusPill({ status }: { status: string }) {
   const cfg =
@@ -2503,6 +2290,8 @@ function DeveloperProfile({
   const p = useDevProfile();
   const [editOpen, setEditOpen] = useState(false);
   const [detailProject, setDetailProject] = useState<DevProject | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const canEditPhoto = isOwnProfile && !!getCachedAuthProfile();
 
   const verified = p.verificationStatus === "Verified";
 
@@ -2523,25 +2312,6 @@ function DeveloperProfile({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div
-        style={{
-          fontSize: 12,
-
-          color: "#94A3B8",
-
-          display: "flex",
-
-          gap: 6,
-
-          alignItems: "center",
-        }}
-      >
-        <span style={{ color: "#2563EB", fontWeight: 500, cursor: "pointer" }}>
-          Dashboard
-        </span>
-        <span>›</span>
-        <span>Developer Profile</span>
-      </div>
 
       {/* Header card */}
       <Card style={{ padding: 24 }}>
@@ -2557,8 +2327,16 @@ function DeveloperProfile({
           }}
         >
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <div
+            <button
+              type="button"
+              onClick={canEditPhoto ? () => setPhotoOpen(true) : undefined}
+              disabled={!canEditPhoto}
+              aria-label="View or change profile photo"
+              title={canEditPhoto ? "View or change profile photo" : undefined}
               style={{
+                padding: 0,
+                cursor: canEditPhoto ? "pointer" : "default",
+                font: "inherit",
                 width: 96,
 
                 height: 96,
@@ -2584,8 +2362,11 @@ function DeveloperProfile({
                 boxShadow: "0 0 0 2px #E2E8F0",
               }}
             >
-              {p.initials}
-            </div>
+              {isOwnProfile ? <MyAvatar kind="person" size={52} /> : <AvatarIcon kind="person" size={52} />}
+            </button>
+            {photoOpen && (
+              <ProfilePhotoViewer name={p.name} isBusiness={false} isMobile={isMobile} onClose={() => setPhotoOpen(false)} />
+            )}
             <div
               style={{
                 position: "absolute",
@@ -2727,7 +2508,8 @@ function DeveloperProfile({
                 fontWeight: 500,
               }}
             >
-              {p.title} — {p.school}
+              {[p.title, p.school].filter(Boolean).join(" · ") ||
+                (isOwnProfile ? "Add your course and school in Settings so clients know who you are." : "")}
             </p>
             {p.academicId && (
               <p
@@ -2898,7 +2680,7 @@ function DeveloperProfile({
             Technical Proficiencies
           </h2>
           {p.skills.length === 0 && p.tools.length === 0 ? (
-            <EmptyState message="No skills added yet. Add your core skills and tools in Edit Portfolio." />
+            <EmptyState icon={<IconChart size={20} />} message="No skills added yet. Add your core skills and tools in Edit Portfolio." />
           ) : (
             <>
               <div
@@ -2964,7 +2746,7 @@ function DeveloperProfile({
             Links & Repositories
           </h2>
           {p.links.length === 0 ? (
-            <EmptyState message="No links added yet. Add your GitHub, LinkedIn, or portfolio in Edit Portfolio." />
+            <EmptyState icon={<IconExternal size={18} />} message="No links added yet. Add your GitHub, LinkedIn, or portfolio in Edit Portfolio." />
           ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {p.links.map((link) => (
@@ -3043,7 +2825,7 @@ function DeveloperProfile({
           </span>
         </div>
         {p.projects.length === 0 ? (
-          <EmptyState message="No completed projects yet. Bid on a project in the Marketplace to start building your track record." />
+          <EmptyState icon={<IconBids size={20} />} message="No completed projects yet. Bid on a project in the Marketplace to start building your track record." />
         ) : (
         <div style={{ overflowX: "auto" }}>
           <table
@@ -3289,7 +3071,7 @@ function DeveloperProfile({
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {reviewCount === 0 && (
-            <EmptyState message="No peer reviews yet. These come in once you complete projects for clients." />
+            <EmptyState icon={<IconStar size={20} />} message="No peer reviews yet. These come in once you complete projects for clients." />
           )}
           {p.reviews.map((r) => (
             <div
@@ -3435,9 +3217,88 @@ function DeveloperProfile({
 
 // ─── Developer Marketplace & Bids ─────────────────────────────────────────────
 
-function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
+function BusinessAvatar({ name, url, size = 44 }: { name: string; url?: string | null; size?: number }) {
+  const [broken, setBroken] = useState(false);
+  const box: React.CSSProperties = { width: size, height: size, borderRadius: 10, flexShrink: 0 };
+  if (url && !broken) {
+    return (
+      <img
+        src={url}
+        alt={`${name} logo`}
+        onError={() => setBroken(true)}
+        style={{ ...box, objectFit: "cover", border: "1px solid #E2E8F0", background: "#fff" }}
+      />
+    );
+  }
+  const palette = ["#2563EB", "#0F766E", "#7C3AED", "#C2410C", "#BE185D", "#15803D"];
+  const color = palette[[...name].reduce((h, ch) => h + ch.charCodeAt(0), 0) % palette.length];
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        ...box,
+        background: color,
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <AvatarIcon kind="business" size={Math.round(size * 0.56)} />
+    </div>
+  );
+}
+
+// Default picture until someone uploads a photo: a person or a building,
+// drawn in the surrounding circle's text color.
+function AvatarIcon({ kind, size }: { kind: "person" | "business"; size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      {kind === "person" ? (
+        <>
+          <circle cx="12" cy="8" r="4.25" />
+          <path d="M3.75 21c0-4.4 3.7-7.5 8.25-7.5s8.25 3.1 8.25 7.5z" />
+        </>
+      ) : (
+        <path
+          fillRule="evenodd"
+          d="M5 3.5A1.5 1.5 0 016.5 2h11A1.5 1.5 0 0119 3.5V20h1.25a.75.75 0 010 1.5H3.75a.75.75 0 010-1.5H5zM8 5.5h2.5V8H8zm5.5 0H16V8h-2.5zM8 10h2.5v2.5H8zm5.5 0H16v2.5h-2.5zM10 15.5h4V20h-4z"
+        />
+      )}
+    </svg>
+  );
+}
+
+function AvatarContent({ kind, url, size }: { kind: "person" | "business"; url?: string | null; size: number }) {
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
+  if (url && url !== brokenUrl) {
+    return (
+      <img
+        src={url}
+        alt=""
+        onError={() => setBrokenUrl(url)}
+        style={{ width: "100%", height: "100%", borderRadius: "inherit", objectFit: "cover", display: "block" }}
+      />
+    );
+  }
+  return <AvatarIcon kind={kind} size={size} />;
+}
+
+function MyAvatar({ kind, size }: { kind: "person" | "business"; size: number }) {
+  return <AvatarContent kind={kind} url={useMyAvatarUrl()} size={size} />;
+}
+
+function MarketplaceFeed({
+  isMobile,
+  onMessageOwner,
+}: {
+  isMobile: boolean;
+  onMessageOwner?: (enterpriseId: string) => Promise<void>;
+}) {
   const [placed, setPlaced] = useState<Record<string, boolean>>({});
   const [bidTarget, setBidTarget] = useState<{ id: string; title: string } | null>(null);
+  const [messaging, setMessaging] = useState<string | null>(null);
+  const [messageError, setMessageError] = useState<{ id: string; text: string } | null>(null);
 
   const authProfile = getCachedAuthProfile();
   const isRealAccount = !!authProfile;
@@ -3516,7 +3377,7 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
               background: "#2563EB",
             }}
           />
-          {projects.length} Open Projects
+          {projects.length} Open {projects.length === 1 ? "Project" : "Projects"}
         </span>
       </div>
 
@@ -3542,25 +3403,48 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
               gap: 12,
             }}
           >
-            <div>
-              <div
-                style={{
-                  fontSize: 15,
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <BusinessAvatar name={project.business} url={project.avatarUrl} />
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 15,
 
-                  fontWeight: 700,
+                    fontWeight: 700,
 
-                  color: "#0F172A",
+                    color: "#0F172A",
 
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {project.title}
-              </div>
-              <div style={{ fontSize: 12.5, color: "#64748B", marginTop: 3 }}>
-                <span style={{ fontWeight: 600, color: "#334155" }}>
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  {project.title}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#1E293B", marginTop: 2 }}>
                   {project.business}
-                </span>{" "}
-                · {project.barangay}
+                </div>
+                {project.barangay && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${project.barangay}, Tagum City, Davao del Norte`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open in Google Maps"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      marginTop: 3,
+                      fontSize: 12.5,
+                      color: "#2563EB",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <svg width={13} height={13} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path d="M10 18s6-5.3 6-10a6 6 0 10-12 0c0 4.7 6 10 6 10z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                      <circle cx="10" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.6" />
+                    </svg>
+                    {project.barangay}, Tagum City
+                  </a>
+                )}
               </div>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -3584,7 +3468,12 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
               {[
                 { label: "Budget", value: project.budget },
 
-                { label: "Deadline", value: project.deadline },
+                {
+                  label: "Timeline",
+                  value: projectTimeline(project.postedAt, project.deadline) ?? `Due ${project.deadline}`,
+                },
+
+                { label: "Duration", value: projectDuration(project.postedAt, project.deadline) ?? "—" },
 
                 { label: "Phases", value: String(project.phases) },
               ].map((stat) => (
@@ -3620,6 +3509,41 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
                 </div>
               ))}
             </div>
+            <div style={{ marginTop: "auto", display: "flex", gap: 8 }}>
+            {project.enterpriseId && onMessageOwner && (
+              <button
+                onClick={async () => {
+                  setMessaging(project.id);
+                  setMessageError(null);
+                  try {
+                    await onMessageOwner(project.enterpriseId!);
+                  } catch (e) {
+                    setMessageError({ id: project.id, text: e instanceof Error ? e.message : "Could not open the conversation" });
+                    setMessaging(null);
+                  }
+                }}
+                disabled={messaging === project.id}
+                aria-label={`Message the owner of ${project.business}`}
+                style={{
+                  flex: 1,
+                  height: 40,
+                  borderRadius: 8,
+                  cursor: messaging === project.id ? "default" : "pointer",
+                  background: "#fff",
+                  color: "#2563EB",
+                  border: "1.5px solid #BFDBFE",
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <IconMessages size={15} /> {messaging === project.id ? "Opening…" : "Message Owner"}
+              </button>
+            )}
             <button
               onClick={() => {
                 if (isRealAccount) {
@@ -3633,7 +3557,7 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
               }}
               disabled={placed[project.id]}
               style={{
-                marginTop: "auto",
+                flex: 1,
 
                 height: 40,
 
@@ -3672,6 +3596,10 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
                 </>
               )}
             </button>
+            </div>
+            {messageError?.id === project.id && (
+              <div role="alert" style={{ fontSize: 12, color: "#B91C1C" }}>{messageError.text}</div>
+            )}
           </Card>
         ))}
       </div>
@@ -3690,7 +3618,7 @@ function MarketplaceFeed({ isMobile }: { isMobile: boolean }) {
   );
 }
 
-function BidsView() {
+function BidsView({ isMobile = false }: { isMobile?: boolean }) {
   const mockBids = useDevBids();
   const authProfile = getCachedAuthProfile();
   const isRealAccount = !!authProfile;
@@ -3721,7 +3649,37 @@ function BidsView() {
       </div>
       {bids.length === 0 ? (
         <Card>
-          <EmptyState message="You have not placed any bids yet. Browse the marketplace to get started." />
+          <EmptyState icon={<IconBids size={20} />} message="You have not placed any bids yet. Browse the marketplace to get started." />
+        </Card>
+      ) : isMobile ? (
+        // Phones: one card per bid so the amount and status are never off-screen.
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          {bids.map((bid, i) => (
+            <div
+              key={bid.id}
+              style={{
+                padding: "14px 16px",
+                borderBottom: i < bids.length - 1 ? "1px solid #F1F5F9" : "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", minWidth: 0, overflowWrap: "anywhere" }}>
+                  {bid.project}
+                </div>
+                <StatusPill status={bid.status} />
+              </div>
+              <div style={{ fontSize: 12.5, color: "#64748B" }}>{bid.client}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12.5 }}>
+                <span style={{ fontWeight: 700, color: "#0F172A", fontSize: 14 }} data-numeric>
+                  {bid.amount}
+                </span>
+                <span style={{ color: "#64748B" }}>Placed {bid.placedAt}</span>
+              </div>
+            </div>
+          ))}
         </Card>
       ) : (
         <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -3844,19 +3802,72 @@ const activityRoleLabel: Record<string, string> = {
   admin: "Platform Admin",
 };
 
-const notifColor = { warning: "#D97706", success: "#16A34A", info: "#2563EB" };
 
 const notifBg = { warning: "#FFFBEB", success: "#F0FDF4", info: "#EFF6FF" };
 
 const notifBorder = { warning: "#FDE68A", success: "#BBF7D0", info: "#BFDBFE" };
 
-const notifIcon = { warning: "⚠️", success: "✅", info: "💬" };
+// Drawn in the matching status colour; one stroke weight, no emoji.
+const notifIcon: Record<"warning" | "success" | "info", React.ReactNode> = {
+  warning: (
+    <svg width={14} height={14} viewBox="0 0 20 20" fill="none" stroke="#D97706" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8.7 3.4L1.9 15a1.5 1.5 0 001.3 2.2h13.6a1.5 1.5 0 001.3-2.2L11.3 3.4a1.5 1.5 0 00-2.6 0z" />
+      <path d="M10 8v3.4M10 14.2v.1" />
+    </svg>
+  ),
+  success: (
+    <svg width={14} height={14} viewBox="0 0 20 20" fill="none" stroke="#16A34A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 10.5l3.5 3.5 7.5-8" />
+    </svg>
+  ),
+  info: (
+    <svg width={14} height={14} viewBox="0 0 20 20" fill="none" stroke="#2563EB" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 9.5c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6-2.9 6-6.5 6c-.9 0-1.8-.2-2.6-.5L3.5 16l1-3.1c-.6-1-1-2.1-1-3.4z" />
+    </svg>
+  ),
+};
 
 // ─── Notification Bell (shared across every top bar) ─────────────────────────
 
+// Two lines when collapsed; "Show more" only appears if the text is actually cut off.
+function ClampedText({ text, expanded, read }: { text: string; expanded: boolean; read: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [clamped, setClamped] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && !expanded) setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [text, expanded]);
+
+  return (
+    <>
+      <span
+        ref={ref}
+        style={{
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: expanded ? "unset" : 2,
+          overflow: "hidden",
+          fontSize: 12.5,
+          lineHeight: 1.5,
+          color: read ? "#475569" : "#0F172A",
+          fontWeight: read ? 500 : 600,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {text}
+      </span>
+      {clamped && (
+        <span style={{ fontSize: 11.5, fontWeight: 600, color: "#2563EB" }}>{expanded ? "Show less" : "Show more"}</span>
+      )}
+    </>
+  );
+}
+
 function NotificationBell() {
-  const { notifications, refresh, markOneRead, markAllRead } = useNotifications();
+  const { notifications, refresh, setRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const unread = notifications.filter((n) => !n.read).length;
 
@@ -3912,11 +3923,11 @@ function NotificationBell() {
           />
           <div
             style={{
-              position: "absolute",
-              top: "calc(100% + 8px)",
-              right: 0,
-              width: 320,
-              maxHeight: 400,
+              // Phones: span the screen under the top bar instead of hanging off the bell.
+              ...(window.innerWidth < 640
+                ? { position: "fixed" as const, top: 64, left: 12, right: 12 }
+                : { position: "absolute" as const, top: "calc(100% + 8px)", right: 0, width: 360 }),
+              maxHeight: window.innerWidth < 640 ? "calc(100dvh - 88px)" : 440,
               overflowY: "auto",
               background: "#fff",
               border: "1px solid #E2E8F0",
@@ -3958,60 +3969,87 @@ function NotificationBell() {
               )}
             </div>
             {notifications.length === 0 ? (
-              <EmptyState message="No notifications yet." />
+              <EmptyState icon={<IconBell size={18} />} message="No notifications yet." />
             ) : (
-              notifications.map((n, i) => (
-                <button
-                  key={n.id}
-                  onClick={() => markOneRead(n.id)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    gap: 10,
-                    textAlign: "left",
-                    padding: "12px 16px",
-                    border: "none",
-                    background: "#fff",
-                    cursor: "pointer",
-                    borderBottom: i < notifications.length - 1 ? "1px solid #F8FAFC" : "none",
-                    opacity: n.read ? 0.55 : 1,
-                    fontFamily: "Inter, sans-serif",
-                  }}
-                >
+              notifications.map((n, i) => {
+                const expanded = expandedId === n.id;
+                return (
                   <div
+                    key={n.id}
                     style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 8,
-                      flexShrink: 0,
-                      background: notifBg[n.type],
-                      border: `1px solid ${notifBorder[n.type]}`,
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 12,
+                      gap: 10,
+                      padding: "12px 14px 12px 16px",
+                      background: n.read ? "#fff" : "#F5F9FF",
+                      borderBottom: i < notifications.length - 1 ? "1px solid #F1F5F9" : "none",
                     }}
                   >
-                    {notifIcon[n.type]}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p
+                    <div
                       style={{
-                        margin: "0 0 3px",
-                        fontSize: 12.5,
-                        color: notifColor[n.type],
-                        lineHeight: 1.5,
-                        fontWeight: n.read ? 500 : 600,
+                        width: 26,
+                        height: 26,
+                        borderRadius: 8,
+                        flexShrink: 0,
+                        background: notifBg[n.type],
+                        border: `1px solid ${notifBorder[n.type]}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
                       }}
                     >
-                      {n.text}
-                    </p>
-                    <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>
-                      {n.time}
-                    </span>
+                      {notifIcon[n.type]}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <button
+                        onClick={() => {
+                          setExpandedId(expanded ? null : n.id);
+                          if (!n.read) setRead(n.id, true);
+                        }}
+                        aria-expanded={expanded}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          padding: 0,
+                          border: "none",
+                          background: "none",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          fontFamily: "Inter, sans-serif",
+                        }}
+                      >
+                        <ClampedText text={n.text} expanded={expanded} read={n.read} />
+                      </button>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>{n.time}</span>
+                        <span style={{ fontSize: 11, color: "#CBD5E1" }}>·</span>
+                        <button
+                          onClick={() => setRead(n.id, !n.read)}
+                          style={{
+                            padding: 0,
+                            border: "none",
+                            background: "none",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "#64748B",
+                            cursor: "pointer",
+                            fontFamily: "Inter, sans-serif",
+                          }}
+                        >
+                          {n.read ? "Mark as unread" : "Mark as read"}
+                        </button>
+                      </div>
+                    </div>
+                    {!n.read && (
+                      <span
+                        aria-label="Unread"
+                        title="Unread"
+                        style={{ width: 8, height: 8, borderRadius: "50%", background: "#2563EB", flexShrink: 0, marginTop: 6 }}
+                      />
+                    )}
                   </div>
-                </button>
-              ))
+                );
+              })
             )}
           </div>
         </>
@@ -4020,7 +4058,24 @@ function NotificationBell() {
   );
 }
 
-function SprintSidebar({
+const sidebarCardLink: React.CSSProperties = {
+  marginTop: 8,
+  padding: 0,
+  border: "none",
+  background: "none",
+  color: "#2563EB",
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: "pointer",
+  fontFamily: "Inter, sans-serif",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+};
+
+// The one sidebar for every student page, so the menu and the Active
+// Project card never change or disappear as you move between pages.
+function StudentSidebar({
   active,
 
   onNav,
@@ -4033,11 +4088,11 @@ function SprintSidebar({
 
   collapsed: boolean;
 }) {
-  // Admin never renders this sidebar (it gets AdminSidebar instead, on every
-  // page it can reach — see the page === "sprint" branch), so this is
-  // always the full student nav.
+  // Admin never renders this sidebar (it gets AdminSidebar instead).
   const visibleItems = studentNavItems;
   const project = useProjectStore();
+  // Demo sessions show the seed project; a real user only once a real contract is loaded.
+  const hasProject = !getCachedAuthProfile() || isUsingRealContract();
   const contracts = useContractSummaries();
 
   const profile = useDevProfile();
@@ -4106,14 +4161,10 @@ function SprintSidebar({
             marginRight: collapsed ? "auto" : 0,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M13 6.66a7.5 7.5 0 010 12.68 7.5 7.5 0 010-12.68z" fill="#93C5FD" />
+            <circle cx="9" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
+            <circle cx="17" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
           </svg>
         </div>
         {!collapsed && (
@@ -4138,83 +4189,81 @@ function SprintSidebar({
         )}
       </div>
 
-      {/* Active project chip — hidden for a real signed-in user with no
-          real contract loaded, instead of showing the demo seed project. */}
-      {!collapsed && (!getCachedAuthProfile() || isUsingRealContract()) && (
+      {!collapsed && (
         <div
           style={{
             margin: "12px 16px 4px",
-
             padding: "10px 12px",
-
             background: "#F0F7FF",
-
             border: "1px solid #BFDBFE",
-
             borderRadius: 10,
           }}
         >
           <div
             style={{
               fontSize: 10,
-
               fontWeight: 700,
-
               color: "#2563EB",
-
               textTransform: "uppercase",
-
               letterSpacing: "0.06em",
-
               marginBottom: 3,
             }}
           >
             Active Project
           </div>
-          {contracts.length > 1 ? (
-            <select
-              value={project.id}
-              onChange={(e) => selectContract(e.target.value)}
-              style={{
-                width: "100%",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#0F172A",
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                fontFamily: "Inter, sans-serif",
-              }}
-            >
-              {contracts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title} {c.status === "Completed" ? "(Completed)" : ""}
-                </option>
-              ))}
-            </select>
+          {hasProject ? (
+            <>
+              {contracts.length > 1 ? (
+                <select
+                  aria-label="Switch active project"
+                  value={project.id}
+                  onChange={(e) => selectContract(e.target.value)}
+                  style={{
+                    width: "100%",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#0F172A",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                >
+                  {contracts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title} {c.status === "Completed" ? "(Completed)" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#0F172A", lineHeight: 1.3 }}>
+                  {project.project}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{project.client}</div>
+              {active !== "sprint" && (
+                <button onClick={() => onNav("sprint")} style={sidebarCardLink}>
+                  Open Sprint Board <IconChevron size={12} dir="right" />
+                </button>
+              )}
+            </>
           ) : (
-            <div
-              style={{
-                fontSize: 12,
-
-                fontWeight: 600,
-
-                color: "#0F172A",
-
-                lineHeight: 1.3,
-              }}
-            >
-              {project.project}
-            </div>
+            <>
+              <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.4 }}>
+                No active project yet. Win a bid to start one.
+              </div>
+              {active !== "marketplace" && (
+                <button onClick={() => onNav("marketplace")} style={sidebarCardLink}>
+                  Browse Marketplace <IconChevron size={12} dir="right" />
+                </button>
+              )}
+            </>
           )}
-          <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-            {project.client}
-          </div>
         </div>
       )}
 
-      <nav style={{ padding: "8px 0", flex: 1 }}>
+      <nav style={{ padding: "8px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
         {visibleItems.map(({ icon: Icon, label, id }) => {
           const isActive = active === id;
 
@@ -4231,7 +4280,7 @@ function SprintSidebar({
 
                 gap: 12,
 
-                padding: collapsed ? "10px 0" : "10px 20px",
+                padding: collapsed ? "10px 0" : "10px 12px",
 
                 justifyContent: collapsed ? "center" : "flex-start",
 
@@ -4240,10 +4289,6 @@ function SprintSidebar({
                 background: isActive ? "#EFF6FF" : "transparent",
 
                 color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
 
                 cursor: "pointer",
 
@@ -4255,9 +4300,7 @@ function SprintSidebar({
 
                 transition: "all 0.12s ease",
 
-                borderRadius: collapsed ? 0 : "0 8px 8px 0",
-
-                marginRight: collapsed ? 0 : 12,
+                borderRadius: 8,
               }}
               onMouseEnter={(e) => {
                 if (!isActive)
@@ -4283,63 +4326,22 @@ function SprintSidebar({
             <div
               style={{
                 width: 32,
-
                 height: 32,
-
                 borderRadius: "50%",
-
                 flexShrink: 0,
-
-                background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[0]})`,
-
+                background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[1]})`,
                 display: "flex",
-
                 alignItems: "center",
-
                 justifyContent: "center",
-
-                fontSize: 11,
-
-                fontWeight: 700,
-
-                color: profile.avatarColors[1],
+                color: "#fff",
               }}
             >
-              {profile.initials}
+              <MyAvatar kind="person" size={18} />
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
-                {profile.name}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-
-                  color: "#16A34A",
-
-                  fontWeight: 600,
-
-                  display: "flex",
-
-                  alignItems: "center",
-
-                  gap: 4,
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-
-                    height: 6,
-
-                    borderRadius: "50%",
-
-                    background: "#16A34A",
-
-                    display: "inline-block",
-                  }}
-                />
-                Active Sprint
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{profile.name}</div>
+              <div style={{ fontSize: 11, color: profile.availability ? "#16A34A" : "#64748B", fontWeight: 600 }}>
+                {profile.availability ? "● Open to Work" : "● Not Open to Work"}
               </div>
             </div>
           </div>
@@ -4385,11 +4387,11 @@ function AdminSprintProgressView() {
       </div>
       <Card style={{ overflow: "hidden" }}>
         {loading ? (
-          <EmptyState message="Loading sprint progress…" />
+          <EmptyState variant="loading" message="Loading sprint progress…" />
         ) : error ? (
-          <EmptyState message={`Failed to load: ${error}`} />
+          <EmptyState variant="error" message={`Failed to load: ${error}`} />
         ) : rows.length === 0 ? (
-          <EmptyState message="No active contracts yet. They'll show up here once a bid is awarded." />
+          <EmptyState icon={<IconKanban size={20} />} message="No active contracts yet. They'll show up here once a bid is awarded." />
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -4613,12 +4615,12 @@ function SprintDashboard({
     atRisk: phases.filter((p) => p.status === "disputed").length,
   };
 
-  const dueLabel = (daysLeft: number, status: SprintPhaseStatus) => {
-    if (status === "completed") return "✅ Delivered";
+  const dueLabel = (daysLeft: number, status: SprintPhaseStatus, deadline: string) => {
+    if (status === "completed") return "Delivered";
 
-    if (daysLeft < 0) return `Overdue by ${Math.abs(daysLeft)}d`;
+    if (!deadline || deadline === "TBD") return "No deadline set";
 
-    return `Due in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`;
+    return daysLeftText(daysLeft);
   };
 
   const postComment = (number: number) => {
@@ -4776,7 +4778,9 @@ function SprintDashboard({
 
                   alignItems: "center",
 
-                  gap: 6,
+                  flexWrap: "wrap",
+
+                  gap: "2px 6px",
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -4792,12 +4796,14 @@ function SprintDashboard({
                     strokeLinecap="round"
                   />
                 </svg>
-                Client:{" "}
-                <span style={{ fontWeight: 600, color: "#334155" }}>
-                  {project.client}
+                <span style={{ whiteSpace: "nowrap" }}>
+                  Client:{" "}
+                  <span style={{ fontWeight: 600, color: "#334155" }}>
+                    {project.client}
+                  </span>
                 </span>
                 <span style={{ color: "#CBD5E1" }}>·</span>
-                <span>
+                <span style={{ whiteSpace: "nowrap" }}>
                   Due{" "}
                   <span
                     style={{
@@ -4871,12 +4877,12 @@ function SprintDashboard({
                     letterSpacing: "-0.03em",
                   }}
                 >
-                  {project.daysLeft}d
+                  {Math.abs(project.daysLeft)}d
                 </div>
                 <div
                   style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}
                 >
-                  Days Left
+                  {project.daysLeft < 0 ? "Overdue" : "Days Left"}
                 </div>
               </div>
             </div>
@@ -5196,7 +5202,7 @@ function SprintDashboard({
                               borderRadius: 99,
                             }}
                           >
-                            Due in {phase.dev.daysLeft}d
+                            {daysLeftText(phase.dev.daysLeft)}
                           </span>
                         )}
                         {isRevision && (
@@ -5422,7 +5428,7 @@ function SprintDashboard({
                                     : "#0F172A",
                               }}
                             >
-                              {dueLabel(phase.dev.daysLeft, phase.status)}
+                              {dueLabel(phase.dev.daysLeft, phase.status, phase.dev.deadline)}
                             </div>
                           </div>
                         </div>
@@ -6735,36 +6741,35 @@ function SprintDashboard({
                 fontWeight: 700,
 
                 color: "#0F172A",
+
+                whiteSpace: "nowrap",
               }}
             >
               Reminder Alerts
             </h3>
-            <span
-              style={{
-                marginLeft: "auto",
-
-                background: unreadNotifs.length ? "#FEF2F2" : "#F8FAFC",
-
-                border: `1px solid ${
-                  unreadNotifs.length ? "#FECACA" : "#E2E8F0"
-                }`,
-
-                color: unreadNotifs.length ? "#DC2626" : "#94A3B8",
-
-                fontSize: 10.5,
-
-                fontWeight: 700,
-
-                padding: "2px 7px",
-
-                borderRadius: 99,
-              }}
-            >
-              {unreadNotifs.length} new
-            </span>
+            {unreadNotifs.length > 0 && (
+              <span
+                style={{
+                  background: "#EFF6FF",
+                  border: "1px solid #BFDBFE",
+                  color: "#1D4ED8",
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  padding: "2px 7px",
+                  borderRadius: 99,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {unreadNotifs.length} new
+              </span>
+            )}
             <button
               onClick={markAllNotificationsRead}
               style={{
+                marginLeft: "auto",
+
+                whiteSpace: "nowrap",
+
                 background: "none",
 
                 border: "none",
@@ -6789,8 +6794,6 @@ function SprintDashboard({
           </div>
           <div style={{ maxHeight: 340, overflowY: "auto" }}>
             {project.notifications.map((n, i) => {
-              const color = notifColor[n.type];
-
               const bg = notifBg[n.type];
 
               const border = notifBorder[n.type];
@@ -6823,9 +6826,6 @@ function SprintDashboard({
                         ? "1px solid #F8FAFC"
                         : "none",
 
-                    opacity: n.read ? 0.55 : 1,
-
-                    transition: "opacity 0.15s",
 
                     fontFamily: "Inter, sans-serif",
                   }}
@@ -6868,7 +6868,7 @@ function SprintDashboard({
 
                         fontSize: 12.5,
 
-                        color: color,
+                        color: n.read ? "#475569" : "#0F172A",
 
                         lineHeight: 1.5,
 
@@ -7075,7 +7075,7 @@ function SprintDashboard({
             </span>
           </div>
           {activityFeed.length === 0 ? (
-            <EmptyState message="No activity yet. Comments and milestone updates will show up here." />
+            <EmptyState icon={<IconLogs size={20} />} message="No activity yet. Comments and milestone updates will show up here." />
           ) : (
             <div style={{ padding: "6px 0" }}>
               {activityFeed.map((a) => (
@@ -7296,7 +7296,7 @@ function SprintOverview({
 
       value: `${completed}/${project.totalPhases}`,
 
-      color: "#16A34A",
+      color: "#0F172A",
 
       bg: "#F0FDF4",
 
@@ -7308,7 +7308,8 @@ function SprintOverview({
 
       value: String(inReview),
 
-      color: "#2563EB",
+      // Only colored when it asks for attention.
+      color: inReview > 0 ? "#B45309" : "#0F172A",
 
       bg: "#EFF6FF",
 
@@ -7318,9 +7319,9 @@ function SprintOverview({
     {
       label: "Next Deadline",
 
-      value: nextPhase ? `${nextPhase.dev.daysLeft}d` : "—",
+      value: nextPhase && nextPhase.dev.deadline !== "TBD" ? daysLeftText(nextPhase.dev.daysLeft) : "—",
 
-      color: "#D97706",
+      color: nextPhase && nextPhase.dev.deadline !== "TBD" && nextPhase.dev.daysLeft < 0 ? "#B91C1C" : "#0F172A",
 
       bg: "#FFFBEB",
 
@@ -7332,11 +7333,11 @@ function SprintOverview({
 
       value: formatPeso(project.paidToDate),
 
-      color: "#7C3AED",
+      color: "#0F172A",
 
-      bg: "#F5F3FF",
+      bg: "#F0FDF4",
 
-      border: "#DDD6FE",
+      border: "#BBF7D0",
     },
   ];
 
@@ -7701,7 +7702,7 @@ function SprintOverview({
 
                       fontSize: 12.5,
 
-                      color: notifColor[n.type],
+                      color: "#0F172A",
 
                       lineHeight: 1.5,
                     }}
@@ -7772,6 +7773,7 @@ function SprintOverview({
             >
               Sprint Milestones <IconChevron size={13} dir="right" />
             </button>
+            {!getCachedAuthProfile() && (
             <button
               onClick={resetDemo}
               style={{
@@ -7804,6 +7806,7 @@ function SprintOverview({
             >
               Reset demo data <IconChevron size={13} dir="right" />
             </button>
+            )}
           </div>
           <div
             style={{
@@ -8738,7 +8741,7 @@ function ProjectSpecForm({
 
         {/* User chip */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <NotificationBell />
+          <HelpButton /><NotificationBell />
           {!isMobile && (
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -10389,14 +10392,10 @@ function ClientSidebar({
             marginRight: collapsed ? "auto" : 0,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M3 14L7 6l3 5 3-7 2 3"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M13 6.66a7.5 7.5 0 010 12.68 7.5 7.5 0 010-12.68z" fill="#93C5FD" />
+            <circle cx="9" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
+            <circle cx="17" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
           </svg>
         </div>
         {!collapsed && (
@@ -10495,7 +10494,7 @@ function ClientSidebar({
         </div>
       )}
 
-      <nav style={{ padding: "8px 0", flex: 1 }}>
+      <nav style={{ padding: "8px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
         {visibleItems.map(({ icon: Icon, label, id }) => {
           const isActive = active === id;
 
@@ -10512,7 +10511,7 @@ function ClientSidebar({
 
                 gap: 11,
 
-                padding: collapsed ? "10px 0" : "10px 18px",
+                padding: collapsed ? "10px 0" : "10px 12px",
 
                 justifyContent: collapsed ? "center" : "flex-start",
 
@@ -10521,10 +10520,6 @@ function ClientSidebar({
                 background: isActive ? "#EFF6FF" : "transparent",
 
                 color: isActive ? "#2563EB" : "#475569",
-
-                borderLeft: isActive
-                  ? "3px solid #2563EB"
-                  : "3px solid transparent",
 
                 cursor: "pointer",
 
@@ -10536,9 +10531,7 @@ function ClientSidebar({
 
                 transition: "all 0.12s",
 
-                borderRadius: collapsed ? 0 : "0 8px 8px 0",
-
-                marginRight: collapsed ? 0 : 10,
+                borderRadius: 8,
               }}
               onMouseEnter={(e) => {
                 if (!isActive)
@@ -10588,7 +10581,7 @@ function ClientSidebar({
                 color: "#065F46",
               }}
             >
-              {client.initials}
+              <MyAvatar kind="business" size={18} />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>
@@ -10781,7 +10774,7 @@ function ClientOverview({ isMobile, onNavigate }: { isMobile: boolean; onNavigat
             <Card style={{ padding: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Active Contract</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{project.project}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{project.client} · Due {project.deadline} ({project.daysLeft}d left)</div>
+              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{project.client} · Due {project.deadline} ({daysLeftText(project.daysLeft)})</div>
               <span style={{ display: "inline-flex", marginTop: 10, padding: "3px 10px", borderRadius: 99, background: "#EFF6FF", border: "1px solid #BFDBFE", color: "#2563EB", fontSize: 11, fontWeight: 700 }}>{project.contractType}</span>
             </Card>
             <Card style={{ padding: 20 }}>
@@ -10815,7 +10808,7 @@ function ClientOverview({ isMobile, onNavigate }: { isMobile: boolean; onNavigat
         </>
       ) : (
         <Card style={{ padding: 0 }}>
-          <EmptyState message="No active contract yet. Award a bid on one of your postings to start tracking it here." />
+          <EmptyState icon={<IconKanban size={20} />} message="No active contract yet. Award a bid on one of your postings to start tracking it here." />
         </Card>
       )}
     </div>
@@ -10867,7 +10860,7 @@ function ProjectContractsView({ onPostProject, isMobile }: { onPostProject: () =
       {isReal && <BidsReceivedPanel />}
       <Card style={{ overflow: "hidden" }}>
         {contracts.length === 0 ? (
-          <EmptyState message="No projects yet. Post a project to see it here." />
+          <EmptyState icon={<IconMarket size={20} />} message="No projects yet. Post a project to see it here." />
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -10963,7 +10956,7 @@ function NewMessageModal({
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name…"
+            placeholder="Search your contacts…"
             style={{
               width: "100%",
               padding: "9px 12px",
@@ -10979,9 +10972,15 @@ function NewMessageModal({
         </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
           {loading ? (
-            <EmptyState message="Searching…" />
+            <EmptyState variant="loading" message="Searching…" />
           ) : results.length === 0 ? (
-            <EmptyState message="No one found." />
+            <EmptyState
+              message={
+                query.trim()
+                  ? "No contacts match that name."
+                  : "Your contacts appear here once you've exchanged bids. Students can also message a business from its marketplace listing."
+              }
+            />
           ) : (
             results.map((p) => (
               <button
@@ -11018,7 +11017,7 @@ function NewMessageModal({
                     color: "#1D4ED8",
                   }}
                 >
-                  {p.initials}
+                  <AvatarContent kind={p.role === "enterprise" ? "business" : "person"} url={p.avatarUrl} size={18} />
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{p.name}</div>
@@ -11115,7 +11114,7 @@ function ContractActivityLog({ isMobile, onBack }: { isMobile: boolean; onBack: 
       </div>
       <Card style={{ overflow: "hidden", padding: 0 }}>
         {rows.length === 0 ? (
-          <EmptyState message="No activity yet. Submissions, comments, and milestone decisions will show up here." />
+          <EmptyState icon={<IconLogs size={20} />} message="No activity yet. Submissions, comments, and milestone decisions will show up here." />
         ) : (
           <AuditTable rows={rows} />
         )}
@@ -11124,9 +11123,15 @@ function ContractActivityLog({ isMobile, onBack }: { isMobile: boolean; onBack: 
   );
 }
 
-function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
+function MessagesView({
+  isMobile = false,
+  initialConversationId = null,
+}: {
+  isMobile?: boolean;
+  initialConversationId?: string | null;
+}) {
   const { conversations, loading: conversationsLoading, refresh: refreshConversations } = useConversations();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(initialConversationId);
   // Mobile: list and thread are two views of the same panel, not a fixed
   // split — picking a conversation shows the thread; Back returns to the
   // list. Desktop keeps the always-visible side-by-side layout.
@@ -11201,15 +11206,15 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
         </button>
       </div>
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", height: 520 }}>
+        <div style={{ display: "flex", height: isMobile ? "max(420px, calc(100dvh - 190px))" : 560 }}>
           {/* Conversation list */}
           {showList && (
           <div style={{ width: isMobile ? "100%" : 260, flexShrink: 0, borderRight: isMobile ? "none" : "1px solid #F1F5F9", overflowY: "auto" }}>
             {conversationsLoading ? (
-              <EmptyState message="Loading…" />
+              <EmptyState variant="loading" message="Loading…" />
             ) : conversations.length === 0 ? (
               <div style={{ padding: 24 }}>
-                <EmptyState message="No conversations yet. Start one with New Message." />
+                <EmptyState icon={<IconMessages size={20} />} message="No conversations yet. Use Message Owner on a marketplace listing, or New Message to reach your contacts. For help from PSITS moderators, use the Help button." />
               </div>
             ) : (
               conversations.map((c) => (
@@ -11231,7 +11236,6 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
                   }}
                 >
                   <div
-                    title={isMobile ? c.otherName : undefined}
                     style={{
                       width: 34,
                       height: 34,
@@ -11247,7 +11251,7 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
                       color: "#1D4ED8",
                     }}
                   >
-                    {c.otherInitials}
+                    <AvatarContent kind={c.otherRole === "enterprise" ? "business" : "person"} url={c.otherAvatarUrl} size={19} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -11257,10 +11261,9 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
                         gap: 6,
                       }}
                     >
-                      {!isMobile && (
                       <span
                         style={{
-                          fontSize: 13,
+                          fontSize: isMobile ? 14 : 13,
                           fontWeight: c.unreadCount > 0 ? 700 : 600,
                           color: "#0F172A",
                           overflow: "hidden",
@@ -11270,7 +11273,6 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
                       >
                         {c.otherName}
                       </span>
-                      )}
                       {c.unreadCount > 0 && (
                         <span
                           style={{
@@ -11310,7 +11312,7 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
             {!active ? (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <EmptyState message="Select a conversation, or start a new one." />
+                <EmptyState icon={<IconMessages size={20} />} message="Select a conversation, or start a new one." />
               </div>
             ) : (
               <>
@@ -11347,7 +11349,7 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
                       color: "#1D4ED8",
                     }}
                   >
-                    {active.otherInitials}
+                    <AvatarContent kind={active.otherRole === "enterprise" ? "business" : "person"} url={active.otherAvatarUrl} size={17} />
                   </div>
                   <div>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{active.otherName}</div>
@@ -11356,9 +11358,9 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
                 </div>
                 <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
                   {messagesLoading ? (
-                    <EmptyState message="Loading…" />
+                    <EmptyState variant="loading" message="Loading…" />
                   ) : messages.length === 0 ? (
-                    <EmptyState message="No messages yet. Say hello." />
+                    <EmptyState icon={<IconMessages size={20} />} message="No messages yet. Say hello." />
                   ) : (
                     messages.map((m) => (
                       <div
@@ -11461,6 +11463,244 @@ function MessagesView({ isMobile = false }: { isMobile?: boolean }) {
   );
 }
 
+// Upload / remove the signed-in user's photo (business logo for enterprises).
+// Shared by the Settings field and the profile photo viewer; avatar.ts makes
+// every avatar on screen update as soon as it changes.
+function useProfilePhotoActions(isBusiness: boolean) {
+  const url = useMyAvatarUrl();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const noun = isBusiness ? "logo" : "photo";
+
+  async function onPick(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    if (!file.type.startsWith("image/")) return setError("Please choose an image file (JPG or PNG).");
+    if (file.size > 20 * 1024 * 1024) return setError("Please choose an image under 20 MB.");
+    setBusy(true);
+    try {
+      await setMyAvatarUrl(await uploadVerificationDocument(file, isBusiness ? "business_logos" : "profile_photos"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Could not upload the ${noun} — please retry.`);
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  const fileInput = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*"
+      aria-label={`Upload ${isBusiness ? "business logo" : "profile photo"}`}
+      onChange={(e) => onPick(e.target.files?.[0])}
+      style={{ display: "none" }}
+    />
+  );
+
+  return {
+    url,
+    busy,
+    error,
+    fileInput,
+    choose: () => inputRef.current?.click(),
+    remove: () => {
+      setError(null);
+      setMyAvatarUrl(null).catch(() => setError(`Could not remove the ${noun} — please retry.`));
+    },
+    uploadLabel: `${url ? "Change" : "Upload"} ${isBusiness ? "Logo" : "Photo"}`,
+  };
+}
+
+function ProfilePhotoField({ isBusiness }: { isBusiness: boolean }) {
+  const photo = useProfilePhotoActions(isBusiness);
+
+  const linkButton: React.CSSProperties = {
+    padding: "6px 12px",
+    borderRadius: 8,
+    border: "1.5px solid #E2E8F0",
+    background: "#fff",
+    color: "#475569",
+    fontSize: 12.5,
+    fontWeight: 600,
+    cursor: photo.busy ? "default" : "pointer",
+    fontFamily: "Inter, sans-serif",
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#334155", marginBottom: 6 }}>
+        {isBusiness ? "Business Logo" : "Profile Photo"}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: isBusiness ? 12 : "50%",
+            flexShrink: 0,
+            background: "#EFF6FF",
+            border: "1px solid #BFDBFE",
+            color: "#2563EB",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+          }}
+        >
+          <AvatarContent kind={isBusiness ? "business" : "person"} url={photo.url} size={30} />
+        </div>
+        {photo.fileInput}
+        <button type="button" disabled={photo.busy} onClick={photo.choose} style={linkButton}>
+          {photo.busy ? "Uploading…" : photo.uploadLabel}
+        </button>
+        {photo.url && !photo.busy && (
+          <button type="button" onClick={photo.remove} style={{ ...linkButton, color: "#B91C1C" }}>
+            Remove
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 6 }}>
+        {isBusiness
+          ? "Shown on your project listings and in messages. JPG or PNG, up to 20 MB."
+          : "Shown on your profile and in messages. JPG or PNG, up to 20 MB."}
+      </div>
+      {photo.error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C", marginTop: 4 }}>{photo.error}</div>}
+    </div>
+  );
+}
+
+// Facebook-style viewer: the current photo (or default icon) at full size,
+// with upload / replace / remove beside it — below it on phones.
+function ProfilePhotoViewer({
+  name,
+  isBusiness,
+  isMobile,
+  onClose,
+}: {
+  name: string;
+  isBusiness: boolean;
+  isMobile: boolean;
+  onClose: () => void;
+}) {
+  const photo = useProfilePhotoActions(isBusiness);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const action: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1.5px solid #E2E8F0",
+    background: "#fff",
+    color: "#0F172A",
+    fontSize: 13.5,
+    fontWeight: 600,
+    cursor: photo.busy ? "default" : "pointer",
+    fontFamily: "Inter, sans-serif",
+    textAlign: "left",
+  };
+  const stage = isMobile ? "min(78vw, 340px)" : "min(56vh, 520px, calc(100vw - 340px))";
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${name} ${isBusiness ? "logo" : "profile photo"}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 120,
+        background: "rgba(15,23,42,0.88)",
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: isMobile ? 20 : 32,
+        padding: 20,
+        overflowY: "auto",
+      }}
+    >
+      <div
+        style={{
+          width: stage,
+          height: stage,
+          flexShrink: 0,
+          borderRadius: isBusiness ? 24 : "50%",
+          overflow: "hidden",
+          background: "linear-gradient(135deg, #93C5FD 0%, #1D4ED8 60%, #93C5FD 100%)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 12px 40px rgba(0,0,0,0.4)",
+        }}
+      >
+        <AvatarContent kind={isBusiness ? "business" : "person"} url={photo.url} size={isMobile ? 150 : 230} />
+      </div>
+
+      <div
+        style={{
+          width: isMobile ? "min(78vw, 340px)" : 260,
+          background: "#fff",
+          borderRadius: 14,
+          padding: 18,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          fontFamily: "Inter, sans-serif",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", overflowWrap: "anywhere" }}>{name}</div>
+            <div style={{ fontSize: 12.5, color: "#64748B" }}>
+              {photo.url ? (isBusiness ? "Business logo" : "Profile photo") : "No photo yet — showing the default"}
+            </div>
+          </div>
+          <button
+            ref={closeRef}
+            onClick={onClose}
+            aria-label="Close"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 22, lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
+        {photo.fileInput}
+        <button
+          type="button"
+          disabled={photo.busy}
+          onClick={photo.choose}
+          style={{ ...action, background: "#2563EB", color: "#fff", border: "none" }}
+        >
+          {photo.busy ? "Uploading…" : photo.uploadLabel}
+        </button>
+        {photo.url && !photo.busy && (
+          <button type="button" onClick={photo.remove} style={{ ...action, color: "#B91C1C" }}>
+            Remove {isBusiness ? "Logo" : "Photo"}
+          </button>
+        )}
+        <div style={{ fontSize: 11.5, color: "#94A3B8" }}>JPG or PNG, up to 20 MB.</div>
+        {photo.error && <div role="alert" style={{ fontSize: 12, color: "#B91C1C" }}>{photo.error}</div>}
+      </div>
+    </div>
+  );
+}
+
 function SettingsView() {
   const client = useClientProfile();
   const dev = useDevProfile();
@@ -11546,6 +11786,7 @@ function SettingsView() {
             : "Your identity, shown on your developer profile."}
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <ProfilePhotoField isBusiness={isEnterprise} />
           <div>
             <label style={labelStyle}>Full Name</label>
             <input style={inputStyle} value={nameInput} onChange={(e) => setNameInput(e.target.value)} />
@@ -11780,7 +12021,7 @@ function MilestoneTrackingPage({
 
   // A real user with no real contract loaded must never see the demo seed
   // project's dispute/comment state (same mock-data-leak class fixed in
-  // SprintSidebar, ClientOverview, and ProjectContractsView).
+  // StudentSidebar, ClientOverview, and ProjectContractsView).
   const hasRealOrDemoProject = !getCachedAuthProfile() || isUsingRealContract();
 
   // The discussion panel below always centers on "the phase currently in
@@ -12119,7 +12360,7 @@ function MilestoneTrackingPage({
                 {messages.length}
               </span>
             </button>
-            <NotificationBell />
+            <HelpButton /><NotificationBell />
             {onLogout && (
               <button
                 onClick={onLogout}
@@ -12327,7 +12568,7 @@ function MilestoneTrackingPage({
                           zIndex: 2 - i,
                         }}
                       >
-                        {dev.initials}
+                        <AvatarIcon kind="person" size={16} />
                       </div>
                     ))}
                   </div>
@@ -12795,9 +13036,7 @@ function MilestoneTrackingPage({
                     style={{
                       background: "#fff",
 
-                      border: "1px solid #E2E8F0",
-
-                      borderLeft: `4px solid ${cfg.border}`,
+                      border: `1px solid ${cfg.border}`,
 
                       borderRadius: 12,
 
@@ -14538,7 +14777,7 @@ function EnterpriseAnalyticsPage({
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <NotificationBell />
+            <HelpButton /><NotificationBell />
             {onLogout && (
               <button
                 onClick={onLogout}
@@ -14596,7 +14835,7 @@ function EnterpriseAnalyticsPage({
                     color: "#fff",
                   }}
                 >
-                  {profile.initials}
+                  <MyAvatar kind="person" size={16} />
                 </div>
                 <span
                   style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}
@@ -15360,11 +15599,11 @@ function EnterpriseAnalyticsPage({
               </button>
             </div>
             {auditLoading ? (
-              <EmptyState message="Loading audit log…" />
+              <EmptyState variant="loading" message="Loading audit log…" />
             ) : auditError ? (
-              <EmptyState message={`Failed to load: ${auditError}`} />
+              <EmptyState variant="error" message={`Failed to load: ${auditError}`} />
             ) : auditLog.length === 0 ? (
-              <EmptyState message="No audit events yet. They'll show up here as verifications, awards, and milestone reviews happen." />
+              <EmptyState icon={<IconLogs size={20} />} message="No audit events yet. They'll show up here as verifications, awards, and milestone reviews happen." />
             ) : (
               <AuditTable rows={auditLog.slice(0, 5)} />
             )}
@@ -15557,6 +15796,165 @@ function PendingVerification({
   );
 }
 
+// ─── Shared top bar (student pages) ──────────────────────────────────────────
+// Same bar on every student page: the page's name, then help, notifications,
+// the signed-in user (a shortcut to their profile) and logout.
+function AppTopBar({
+  title,
+  isMobile,
+  onMenu,
+  onProfile,
+  onLogout,
+  extra,
+}: {
+  title: string;
+  isMobile: boolean;
+  onMenu: () => void;
+  onProfile: () => void;
+  onLogout: () => void;
+  extra?: React.ReactNode;
+}) {
+  const profile = useDevProfile();
+  const name = getCachedAuthProfile()?.name || profile.name;
+
+  return (
+    <header
+      style={{
+        background: "#fff",
+        borderBottom: "1px solid #E2E8F0",
+        padding: isMobile ? "10px 16px" : "12px 32px",
+        minHeight: 60,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        position: "sticky",
+        top: 0,
+        zIndex: 30,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        {isMobile && (
+          <button
+            onClick={onMenu}
+            aria-label="Open menu"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#475569", lineHeight: 0, padding: 6, borderRadius: 8 }}
+          >
+            <IconMenu size={20} />
+          </button>
+        )}
+        <div
+          style={{
+            margin: 0,
+            fontSize: 16,
+            fontWeight: 700,
+            color: "#0F172A",
+            letterSpacing: "-0.01em",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {title}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        {extra}
+        <HelpButton />
+        <NotificationBell />
+        {!isMobile && (
+          <button
+            onClick={onProfile}
+            title="View your profile"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "4px 12px 4px 4px",
+              border: "1px solid #E2E8F0",
+              borderRadius: 99,
+              background: "#fff",
+              cursor: "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+          >
+            <span
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[1]})`,
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                flexShrink: 0,
+              }}
+            >
+              <MyAvatar kind="person" size={16} />
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {name}
+            </span>
+          </button>
+        )}
+        <button
+          onClick={onLogout}
+          style={{
+            padding: "7px 12px",
+            borderRadius: 8,
+            border: "1px solid #E2E8F0",
+            background: "#fff",
+            color: "#475569",
+            fontSize: 12.5,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "Inter, sans-serif",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+        >
+          Log out
+        </button>
+      </div>
+    </header>
+  );
+}
+
+// Overdue only when the date has actually passed; otherwise a neutral reminder.
+function DeadlineChip({ label, date }: { label: string; date: string }) {
+  const due = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdue = !Number.isNaN(due.getTime()) && due < today;
+  const c = overdue
+    ? { bg: "#FEF2F2", border: "#FECACA", fg: "#DC2626" }
+    : { bg: "#F8FAFC", border: "#E2E8F0", fg: "#475569" };
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "5px 12px",
+        borderRadius: 99,
+        background: c.bg,
+        border: `1px solid ${c.border}`,
+        color: c.fg,
+        fontSize: 12,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.fg }} />
+      {overdue ? `${label} overdue · ${date.split(",")[0]}` : `${label} due ${date.split(",")[0]}`}
+    </span>
+  );
+}
+
 // ─── Root App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -15569,6 +15967,9 @@ export default function App() {
   const clientProfile = useClientProfile();
 
   const [devNav, setDevNav] = useState("dashboard");
+
+  // Set by "Message Owner" on a listing so Messages opens on that conversation.
+  const [openConversationId, setOpenConversationId] = useState<string | null>(null);
 
   const [adminNav, setAdminNav] = useState("verification");
 
@@ -15993,7 +16394,7 @@ export default function App() {
                     collapsed={collapsed}
                   />
                 ) : (
-                  <DevSidebar
+                  <StudentSidebar
                     active={devNav === "dashboard" ? "profile" : devNav}
                     onNav={(id) => {
                       if (id === "sprintoverview" || id === "sprint") {
@@ -16011,139 +16412,46 @@ export default function App() {
               </div>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
-              {isMobile && (
-                <div
-                  style={{
-                    background: "#fff",
-
-                    borderBottom: "1px solid #E2E8F0",
-
-                    padding: "12px 20px",
-
-                    display: "flex",
-
-                    alignItems: "center",
-
-                    gap: 12,
-
-                    position: "sticky",
-
-                    top: 0,
-
-                    zIndex: 30,
-                  }}
-                >
-                  <button
-                    onClick={() => setSidebarOpen(true)}
-                    style={{
-                      background: "none",
-
-                      border: "none",
-
-                      cursor: "pointer",
-
-                      color: "#475569",
-
-                      padding: 4,
-
-                      lineHeight: 0,
-                    }}
-                  >
-                    <IconMenu size={20} />
-                  </button>
-                  <div
-                    style={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}
-                  >
-                    StartupMatch
-                  </div>
-                  <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-                    <NotificationBell />
-                    <button
-                      onClick={handleLogout}
-                      style={{
-                        padding: "6px 12px",
-
-                        borderRadius: 6,
-
-                        border: "1px solid #E2E8F0",
-
-                        background: "#fff",
-
-                        color: "#64748B",
-
-                        fontSize: 12,
-
-                        fontWeight: 600,
-
-                        cursor: "pointer",
-
-                        fontFamily: "Inter, sans-serif",
-                      }}
-                    >
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              )}
-              {!isMobile && (
-                <div
-                  style={{
-                    display: "flex",
-
-                    alignItems: "center",
-
-                    justifyContent: "flex-end",
-
-                    gap: 8,
-
-                    padding: "12px 32px 0 32px",
-                  }}
-                >
-                  <NotificationBell />
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      padding: "6px 12px",
-
-                      borderRadius: 6,
-
-                      border: "1px solid #E2E8F0",
-
-                      background: "#fff",
-
-                      color: "#64748B",
-
-                      fontSize: 12,
-
-                      fontWeight: 600,
-
-                      cursor: "pointer",
-
-                      fontFamily: "Inter, sans-serif",
-                    }}
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
+              <AppTopBar
+                title={
+                  ({
+                    dashboard: "Developer Profile",
+                    marketplace: "Marketplace",
+                    bids: "Bids",
+                    resumecheck: "Resume Check",
+                    messages: "Messages",
+                    settings: "Settings",
+                  } as Record<string, string>)[devNav] ?? "Developer Profile"
+                }
+                isMobile={isMobile}
+                onMenu={() => setSidebarOpen(true)}
+                onProfile={() => setDevNav("dashboard")}
+                onLogout={handleLogout}
+              />
               <main
                 style={{
                   padding: isMobile ? "20px 16px 80px" : "32px 32px 80px",
                 }}
               >
-                <div style={{ maxWidth: 900, margin: "0 auto" }}>
+                <div key={devNav} className="sm-page" style={{ maxWidth: 960, margin: "0 auto" }}>
                   {devNav === "dashboard" ? (
                     <DeveloperProfile isMobile={isMobile} isOwnProfile={true} />
                   ) : devNav === "marketplace" && appRole !== "admin" ? (
-                    <MarketplaceFeed isMobile={isMobile} />
+                    <MarketplaceFeed
+                      isMobile={isMobile}
+                      onMessageOwner={async (enterpriseId) => {
+                        setOpenConversationId(await startConversationWith(enterpriseId));
+                        setDevNav("messages");
+                      }}
+                    />
                   ) : devNav === "bids" && appRole !== "admin" ? (
-                    <BidsView />
+                    <BidsView isMobile={isMobile} />
                   ) : devNav === "resumecheck" && appRole !== "admin" ? (
                     <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "#94A3B8", fontSize: 13 }}>Loading Resume Check…</div>}>
                       <ResumeCheckPage />
                     </Suspense>
                   ) : devNav === "messages" ? (
-                    <MessagesView isMobile={isMobile} />
+                    <MessagesView isMobile={isMobile} initialConversationId={openConversationId} />
                   ) : devNav === "settings" ? (
                     <SettingsView />
                   ) : (
@@ -16275,7 +16583,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <NotificationBell />
+                <HelpButton /><NotificationBell />
                 {!isMobile && (
                   <div
                     style={{
@@ -16315,7 +16623,7 @@ export default function App() {
                         color: "#fff",
                       }}
                     >
-                      {profile.initials}
+                      <MyAvatar kind="person" size={16} />
                     </div>
                     <span
                       style={{
@@ -16369,8 +16677,8 @@ export default function App() {
             >
               {adminNav === "auditlogs" ? (
                 <AuditLogsPage />
-              ) : adminNav === "messages" ? (
-                <MessagesView isMobile={isMobile} />
+              ) : adminNav === "support" ? (
+                <SupportTicketsPage isMobile={isMobile} />
               ) : adminNav === "settings" ? (
                 <SettingsView />
               ) : (
@@ -16429,7 +16737,7 @@ export default function App() {
                     collapsed={collapsed}
                   />
                 ) : (
-                  <SprintSidebar
+                  <StudentSidebar
                     active={sprintNav === "dashboard" ? "sprintoverview" : sprintNav}
                     onNav={(id) => {
                       if (id === "sprintoverview") {
@@ -16459,214 +16767,28 @@ export default function App() {
                 flexDirection: "column",
               }}
             >
-              {/* Sprint top bar */}
-              <div
-                style={{
-                  background: "#fff",
-
-                  borderBottom: "1px solid #E2E8F0",
-
-                  padding: isMobile ? "12px 16px" : "13px 32px",
-
-                  display: "flex",
-
-                  alignItems: "center",
-
-                  justifyContent: "space-between",
-
-                  position: "sticky",
-
-                  top: 0,
-
-                  zIndex: 30,
+              <AppTopBar
+                title={sprintNav === "dashboard" ? "Sprint Overview" : sprintNav === "sprint" ? "Sprint Board" : "Sprint Dashboard"}
+                isMobile={isMobile}
+                onMenu={() => setSidebarOpen(true)}
+                onProfile={() => {
+                  setPage("developer");
+                  setDevNav("dashboard");
                 }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {isMobile && (
-                    <button
-                      onClick={() => setSidebarOpen(true)}
-                      style={{
-                        background: "none",
-
-                        border: "none",
-
-                        cursor: "pointer",
-
-                        color: "#94A3B8",
-
-                        lineHeight: 0,
-
-                        padding: 4,
-                      }}
-                    >
-                      <IconMenu size={20} />
-                    </button>
-                  )}
-                  <div>
-                    {!isMobile && (
-                      <div
-                        style={{
-                          fontSize: 11,
-
-                          color: "#94A3B8",
-
-                          fontWeight: 600,
-
-                          textTransform: "uppercase",
-
-                          letterSpacing: "0.05em",
-                        }}
-                      >
-                        {appRole === "admin" ? "Regional Admin Dashboard" : "Student Developer Module"}
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        fontSize: 15,
-
-                        fontWeight: 700,
-
-                        color: "#0F172A",
-                      }}
-                    >
-                      Sprint Dashboard
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {/* Deadline chip — hidden for a real user with no real
-                      contract loaded, instead of showing the demo deadline. */}
-                  {!isMobile &&
-                    (!getCachedAuthProfile() || isUsingRealContract()) &&
-                    (() => {
-                      const due = project.phases.find(
-                        (p) =>
-                          p.status === "active" || p.status === "in_review",
-                      );
-
-                      return (
-                        <span
-                          style={{
-                            display: "inline-flex",
-
-                            alignItems: "center",
-
-                            gap: 5,
-
-                            padding: "5px 12px",
-
-                            borderRadius: 99,
-
-                            background: "#FEF2F2",
-
-                            border: "1px solid #FECACA",
-
-                            color: "#DC2626",
-
-                            fontSize: 12,
-
-                            fontWeight: 700,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 6,
-
-                              height: 6,
-
-                              borderRadius: "50%",
-
-                              background: "#DC2626",
-                            }}
-                          />
-                          {due
-                            ? `Sprint ${due.number} due ${due.dev.deadline.split(",")[0]}`
-                            : `Due ${project.deadline}`}
-                        </span>
-                      );
-                    })()}
-                  <NotificationBell />
-                  {!isMobile && (
-                    <div
-                      style={{
-                        display: "flex",
-
-                        alignItems: "center",
-
-                        gap: 8,
-
-                        padding: "5px 12px 5px 5px",
-
-                        border: "1px solid #E2E8F0",
-
-                        borderRadius: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 28,
-
-                          height: 28,
-
-                          borderRadius: "50%",
-
-                          background: `linear-gradient(135deg, ${profile.avatarColors[0]}, ${profile.avatarColors[0]})`,
-
-                          display: "flex",
-
-                          alignItems: "center",
-
-                          justifyContent: "center",
-
-                          fontSize: 11,
-
-                          fontWeight: 700,
-
-                          color: profile.avatarColors[1],
-                        }}
-                      >
-                        {profile.initials}
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 13,
-
-                          fontWeight: 600,
-
-                          color: "#334155",
-                        }}
-                      >
-                        {profile.name}
-                      </span>
-                    </div>
-                  )}
-                  {/* Logout — always accessible post-login (best practice) */}
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      padding: "6px 12px",
-
-                      borderRadius: 6,
-
-                      border: "1px solid #E2E8F0",
-
-                      background: "#fff",
-
-                      color: "#64748B",
-
-                      fontSize: 12,
-
-                      fontWeight: 600,
-
-                      cursor: "pointer",
-
-                      fontFamily: "Inter, sans-serif",
-                    }}
-                  >
-                    Logout
-                  </button>
-                </div>
-              </div>
+                onLogout={handleLogout}
+                extra={
+                  !isMobile && (!getCachedAuthProfile() || isUsingRealContract())
+                    ? (() => {
+                        const due = project.phases.find((p) => p.status === "active" || p.status === "in_review");
+                        return due && due.dev.deadline && due.dev.deadline !== "TBD" ? (
+                          <DeadlineChip label={`Sprint ${due.number}`} date={due.dev.deadline} />
+                        ) : project.deadline ? (
+                          <DeadlineChip label="Project" date={project.deadline} />
+                        ) : null;
+                      })()
+                    : null
+                }
+              />
 
               <main
                 style={{
@@ -16677,6 +16799,7 @@ export default function App() {
                   overflowY: "auto",
                 }}
               >
+                <div key={sprintNav} className="sm-page">
                 {sprintNav === "dashboard" ? (
                   <SprintOverview
                     isMobile={isMobile}
@@ -16686,12 +16809,13 @@ export default function App() {
                 ) : sprintNav === "sprint" ? (
                   <SprintDashboard isMobile={isMobile} isTablet={isTablet} appRole={appRole} />
                 ) : sprintNav === "bids" ? (
-                  <BidsView />
+                  <BidsView isMobile={isMobile} />
                 ) : sprintNav === "messages" ? (
                   <MessagesView isMobile={isMobile} />
                 ) : (
                   <SettingsView />
                 )}
+                </div>
               </main>
             </div>
           </div>

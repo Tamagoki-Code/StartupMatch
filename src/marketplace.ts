@@ -47,14 +47,15 @@ interface RawMarketplaceRow {
   phases: number
   posted_at: string
   barangay: string | null
-  enterprise_profiles: { business: string } | null
+  enterprise_id: string
+  enterprise_profiles: { business: string; profiles: { avatar_url: string | null } | null } | null
 }
 
 async function fetchOpenProjects(): Promise<MarketplaceProject[]> {
   const { data, error } = await supabase
     .from("marketplace_projects")
     .select(
-      "id, title, tags, budget_min, budget_max, deadline, phases, posted_at, barangay, enterprise_profiles(business)",
+      "id, title, tags, budget_min, budget_max, deadline, phases, posted_at, barangay, enterprise_id, enterprise_profiles(business, profiles(avatar_url))",
     )
     .eq("status", "Open")
     .order("posted_at", { ascending: false })
@@ -71,6 +72,8 @@ async function fetchOpenProjects(): Promise<MarketplaceProject[]> {
     deadline: formatDate(row.deadline),
     phases: row.phases,
     postedAt: formatDate(row.posted_at),
+    enterpriseId: row.enterprise_id,
+    avatarUrl: row.enterprise_profiles?.profiles?.avatar_url ?? null,
   }))
 }
 

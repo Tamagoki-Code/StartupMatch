@@ -35,6 +35,7 @@ export interface ConversationRow {
   otherName: string
   otherRole: string
   otherInitials: string
+  otherAvatarUrl: string | null
   lastMessagePreview: string
   lastMessageAt: string
   unreadCount: number
@@ -54,6 +55,7 @@ export interface MessageableProfile {
   name: string
   role: string
   initials: string
+  avatarUrl: string | null
 }
 
 async function fetchConversations(myId: string): Promise<ConversationRow[]> {
@@ -89,8 +91,8 @@ async function fetchConversations(myId: string): Promise<ConversationRow[]> {
   const otherIds = [...new Set(otherPartsRes.data.map((p) => p.profile_id))]
 
   const { data: otherProfiles } = otherIds.length
-    ? await supabase.from("profiles").select("id, name, role").in("id", otherIds)
-    : { data: [] as { id: string; name: string; role: string }[] }
+    ? await supabase.from("profiles").select("id, name, role, avatar_url").in("id", otherIds)
+    : { data: [] as { id: string; name: string; role: string; avatar_url: string | null }[] }
   const profileById = new Map((otherProfiles ?? []).map((p) => [p.id, p]))
 
   const lastMsgByConv = new Map<string, { body: string; created_at: string }>()
@@ -116,6 +118,7 @@ async function fetchConversations(myId: string): Promise<ConversationRow[]> {
         otherName: profile?.name ?? "Unknown User",
         otherRole: profile?.role ?? "",
         otherInitials: initialsFrom(profile?.name ?? "?"),
+        otherAvatarUrl: profile?.avatar_url ?? null,
         lastMessagePreview: lastMsg?.body ?? "No messages yet",
         lastMessageAt: lastMessageAtByConv.get(id) ?? "",
         unreadCount: unreadByConv.get(id) ?? 0,
@@ -232,12 +235,42 @@ export async function markConversationRead(conversationId: string): Promise<void
     .eq("profile_id", me.id)
 }
 
+// Contacts only, not the whole user directory: a student sees the businesses
+// whose projects they bid on, a business sees the students who bid on its
+// projects. Moderators are reached through Help (support tickets) instead.
+// shortcut: enforced in the UI only — get_or_create_conversation still accepts
+// any profile id; move this rule into that function if it must be strict.
+async function fetchContactIds(me: { id: string; role: string }): Promise<string[]> {
+  if (me.role === "student") {
+    const { data, error } = await supabase
+      .from("bids")
+      .select("marketplace_projects(enterprise_id)")
+      .eq("student_id", me.id)
+    if (error) throw error
+    return (data as unknown as { marketplace_projects: { enterprise_id: string } | null }[])
+      .map((b) => b.marketplace_projects?.enterprise_id ?? "")
+  }
+  if (me.role === "enterprise") {
+    const { data, error } = await supabase
+      .from("bids")
+      .select("student_id, marketplace_projects!inner(enterprise_id)")
+      .eq("marketplace_projects.enterprise_id", me.id)
+    if (error) throw error
+    return (data as unknown as { student_id: string }[]).map((b) => b.student_id)
+  }
+  return []
+}
+
 export async function searchMessageableProfiles(query: string): Promise<MessageableProfile[]> {
   const me = getCachedAuthProfile()
+  if (!me) return []
+  const ids = [...new Set(await fetchContactIds(me))].filter((id) => id && id !== me.id)
+  if (ids.length === 0) return []
+
   let q = supabase
     .from("profiles")
-    .select("id, name, role")
-    .neq("id", me?.id ?? "")
+    .select("id, name, role, avatar_url")
+    .in("id", ids)
     .order("name")
     .limit(20)
   if (query.trim()) q = q.ilike("name", `%${query.trim()}%`)
@@ -250,5 +283,6 @@ export async function searchMessageableProfiles(query: string): Promise<Messagea
     name: p.name,
     role: p.role,
     initials: initialsFrom(p.name),
+    avatarUrl: p.avatar_url ?? null,
   }))
 }

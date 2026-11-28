@@ -13,13 +13,20 @@ export interface AdminProfileRow {
   documentUrl: string | null
   establishmentPhotoUrl: string | null
   lastSeenAt: string | null
+  // Academic ID (student) or business permit / DTI no. (enterprise), as typed at signup.
+  idNumber: string | null
+  school: string | null
+  business: string | null
+  barangay: string | null
 }
 
 async function fetchAllProfiles(): Promise<AdminProfileRow[]> {
   const [profilesRes, documentsRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, role, name, email, verification_status, created_at, last_seen_at")
+      .select(
+        "id, role, name, email, verification_status, created_at, last_seen_at, student_profiles(academic_id, school), enterprise_profiles(business, permit, barangay)",
+      )
       .order("created_at", { ascending: false }),
     supabase.from("verification_documents").select("profile_id, document_url, establishment_photo_url"),
   ])
@@ -33,7 +40,13 @@ async function fetchAllProfiles(): Promise<AdminProfileRow[]> {
     ]),
   )
 
-  return (profilesRes.data ?? []).map((row) => ({
+  // One-to-one embeds can come back as an object or a one-item array.
+  const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null))
+
+  return (profilesRes.data ?? []).map((row) => {
+    const stu = one(row.student_profiles)
+    const ent = one(row.enterprise_profiles)
+    return {
     id: row.id,
     role: row.role,
     name: row.name,
@@ -43,7 +56,12 @@ async function fetchAllProfiles(): Promise<AdminProfileRow[]> {
     documentUrl: docByProfile.get(row.id)?.documentUrl ?? null,
     establishmentPhotoUrl: docByProfile.get(row.id)?.establishmentPhotoUrl ?? null,
     lastSeenAt: row.last_seen_at,
-  }))
+    idNumber: (row.role === "enterprise" ? ent?.permit : stu?.academic_id) || null,
+    school: stu?.school || null,
+    business: ent?.business || null,
+    barangay: ent?.barangay || null,
+    }
+  })
 }
 
 // Real-accounts admin roster. RLS still gates the underlying writes (only an

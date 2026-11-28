@@ -237,6 +237,61 @@ function IconUserCheck({ size = 16 }: { size?: number }) {
   )
 }
 
+function IconUpload({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <path
+        d="M10 13V3.5M6.5 7L10 3.5 13.5 7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3 13.5V15a2 2 0 002 2h10a2 2 0 002-2v-1.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function Spinner({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      style={{ animation: "authSpin 0.8s linear infinite" }}
+    >
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+      <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconAlertTriangle({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <path
+        d="M8.68 3.36L1.98 15a1.5 1.5 0 001.3 2.25h13.44a1.5 1.5 0 001.3-2.25L11.32 3.36a1.5 1.5 0 00-2.64 0z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 8v3.2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="10" cy="14.1" r="0.9" fill="currentColor" />
+    </svg>
+  )
+}
+
 // ─── Brand ─────────────────────────────────────────────────────────────────────
 
 function BrandLogo({ compact = false }: { compact?: boolean }) {
@@ -259,14 +314,11 @@ function BrandLogo({ compact = false }: { compact?: boolean }) {
           backdropFilter: "blur(4px)",
         }}
       >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path
-            d="M3 14L7 6l3 5 3-7 2 3"
-            stroke="#fff"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+        {/* Same mark as public/favicon.svg: two overlapping circles, the match. */}
+        <svg width="22" height="22" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+          <path d="M13 6.66a7.5 7.5 0 010 12.68 7.5 7.5 0 010-12.68z" fill="#93C5FD" />
+          <circle cx="9" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
+          <circle cx="17" cy="13" r="7.5" stroke="#fff" strokeWidth="2.6" />
         </svg>
       </div>
       {!compact && (
@@ -736,19 +788,21 @@ function DocumentUploadField({
           height: 46,
           padding: "0 14px",
           borderRadius: 10,
-          background: "#fff",
-          border: "1.5px dashed #CBD5E1",
+          background: file ? "#F0FDF4" : "#fff",
+          border: `1.5px dashed ${file ? "#86EFAC" : "#CBD5E1"}`,
           cursor: "pointer",
+          transition: "background 0.15s, border-color 0.15s",
         }}
       >
-        <span style={{ color: "#94A3B8", lineHeight: 0 }}>
-          <IconUserCheck size={18} />
+        <span style={{ color: file ? "#16A34A" : "#94A3B8", lineHeight: 0, flexShrink: 0 }}>
+          {file ? <IconCheck size={16} /> : <IconUpload size={18} />}
         </span>
         <span
           style={{
             flex: 1,
             fontSize: 13,
-            color: file ? "#0F172A" : "#94A3B8",
+            fontWeight: file ? 600 : 400,
+            color: file ? "#166534" : "#94A3B8",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -756,7 +810,9 @@ function DocumentUploadField({
         >
           {file ? file.name : "Choose an image (JPG, PNG)…"}
         </span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#2563EB", flexShrink: 0 }}>Browse</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#2563EB", flexShrink: 0 }}>
+          {file ? "Change" : "Browse"}
+        </span>
         <input
           type="file"
           accept="image/*"
@@ -783,6 +839,10 @@ export default function AuthPage({ onSignedIn }: {
   const [remember, setRemember] = useState(true)
 
   const [error, setError] = useState<string | null>(null)
+
+  // Distinguishes a real auth/server failure (worth the "logged" notice) from
+  // a plain client-side validation message — both render in the same banner.
+  const [authFailureError, setAuthFailureError] = useState(false)
 
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -877,6 +937,7 @@ export default function AuthPage({ onSignedIn }: {
 
     if (validationError) {
       setNotice(null)
+      setAuthFailureError(false)
       setError(validationError)
       return
     }
@@ -893,10 +954,12 @@ export default function AuthPage({ onSignedIn }: {
         onSignedIn?.(profile.email, profile.role)
       } catch {
         setNotice(null)
+        setAuthFailureError(true)
         setError("Authentication Failed")
       }
     } catch (err) {
       setNotice(null)
+      setAuthFailureError(true)
       setError(err instanceof Error ? err.message : "Authentication Failed")
     } finally {
       setSubmitting(false)
@@ -908,6 +971,7 @@ export default function AuthPage({ onSignedIn }: {
 
     if (!agreed) {
       setNotice(null)
+      setAuthFailureError(false)
       setError("Please agree to the Terms of Service & EULA")
       return
     }
@@ -933,6 +997,7 @@ export default function AuthPage({ onSignedIn }: {
 
     if (validationError) {
       setNotice(null)
+      setAuthFailureError(false)
       setError(validationError)
       return
     }
@@ -976,11 +1041,13 @@ export default function AuthPage({ onSignedIn }: {
           onSignedIn?.(register.email, role)
         } catch {
           setNotice(null)
+          setAuthFailureError(true)
           setError("Registration Failed")
         }
       }
     } catch (err) {
       setNotice(null)
+      setAuthFailureError(true)
       setError(err instanceof Error ? err.message : "Registration Failed")
     } finally {
       setSubmitting(false)
@@ -1000,6 +1067,7 @@ export default function AuthPage({ onSignedIn }: {
         overflowX: "hidden",
       }}
     >
+      <style>{`@keyframes authSpin{to{transform:rotate(360deg)}}`}</style>
       {/* ── LEFT: Branding panel (desktop, ≥1024px) ───────────────────── */}
       <div
         className="hidden lg:flex"
@@ -1259,6 +1327,7 @@ export default function AuthPage({ onSignedIn }: {
                 {/* Security feedback banner */}
                 {error && (
                   <div
+                    role="alert"
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
@@ -1272,7 +1341,11 @@ export default function AuthPage({ onSignedIn }: {
                       marginBottom: 18,
                     }}
                   >
-                    <span style={{ fontSize: 15, lineHeight: 1.2 }}>⚠️</span>
+                    <span
+                      style={{ color: "#DC2626", lineHeight: 0, marginTop: 1, flexShrink: 0 }}
+                    >
+                      <IconAlertTriangle size={16} />
+                    </span>
                     <div
                       style={{
                         fontSize: 12.5,
@@ -1281,9 +1354,11 @@ export default function AuthPage({ onSignedIn }: {
                       }}
                     >
                       <div style={{ fontWeight: 700 }}>{error}</div>
-                      <div style={{ color: "#DC2626", fontWeight: 500 }}>
-                        Security event logged.
-                      </div>
+                      {authFailureError && (
+                        <div style={{ color: "#DC2626", fontWeight: 500 }}>
+                          Security event logged.
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1492,11 +1567,12 @@ export default function AuthPage({ onSignedIn }: {
                   }}
                 >
                   {submitting ? "Signing In…" : "Sign In to Dashboard"}{" "}
-                  <IconArrowRight size={16} />
+                  {submitting ? <Spinner size={16} /> : <IconArrowRight size={16} />}
                 </button>
 
                 {notice && (
                   <div
+                    role="status"
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
@@ -1581,6 +1657,7 @@ export default function AuthPage({ onSignedIn }: {
                 {/* Security feedback banner */}
                 {error && (
                   <div
+                    role="alert"
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
@@ -1594,7 +1671,11 @@ export default function AuthPage({ onSignedIn }: {
                       marginBottom: 18,
                     }}
                   >
-                    <span style={{ fontSize: 15, lineHeight: 1.2 }}>⚠️</span>
+                    <span
+                      style={{ color: "#DC2626", lineHeight: 0, marginTop: 1, flexShrink: 0 }}
+                    >
+                      <IconAlertTriangle size={16} />
+                    </span>
                     <div
                       style={{
                         fontSize: 12.5,
@@ -1603,14 +1684,21 @@ export default function AuthPage({ onSignedIn }: {
                       }}
                     >
                       <div style={{ fontWeight: 700 }}>{error}</div>
-                      <div style={{ color: "#DC2626", fontWeight: 500 }}>
-                        Security event logged.
-                      </div>
+                      {authFailureError && (
+                        <div style={{ color: "#DC2626", fontWeight: 500 }}>
+                          Security event logged.
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* Role selection */}
+                <div
+                  style={{ fontSize: 12, fontWeight: 600, color: "#334155", marginBottom: 8 }}
+                >
+                  I am registering as
+                </div>
                 <div
                   style={{
                     display: "flex",
@@ -1631,6 +1719,13 @@ export default function AuthPage({ onSignedIn }: {
                         onClick={() => {
                           setRole(r)
                           setError(null)
+                        }}
+                        aria-pressed={selected}
+                        onMouseEnter={(e) => {
+                          if (!selected) e.currentTarget.style.borderColor = "#93C5FD"
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!selected) e.currentTarget.style.borderColor = "#E2E8F0"
                         }}
                         style={{
                           display: "flex",
@@ -1912,6 +2007,17 @@ export default function AuthPage({ onSignedIn }: {
                       }}
                     />
                   </Field>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: register.password.length >= 8 ? "#16A34A" : "#94A3B8",
+                      transition: "color 0.15s",
+                    }}
+                  >
+                    {register.password.length >= 8
+                      ? "Looks good"
+                      : "Use at least 8 characters"}
+                  </span>
                 </div>
 
                 {/* Dynamic ID field based on role */}
@@ -2061,11 +2167,12 @@ export default function AuthPage({ onSignedIn }: {
                     : submitting
                       ? "Creating Account…"
                       : "Register & Request Verification"}{" "}
-                  <IconArrowRight size={16} />
+                  {submitting ? <Spinner size={16} /> : <IconArrowRight size={16} />}
                 </button>
 
                 {notice && (
                   <div
+                    role="status"
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
